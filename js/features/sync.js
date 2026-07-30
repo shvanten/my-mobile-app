@@ -40,6 +40,10 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
   function read(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
   }
+  function write(key, val) {
+    if (val == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(val));
+  }
   function collect() {
     return {
       v: 1,
@@ -59,29 +63,81 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
     };
   }
 
-  // 合并云端 base 与本地 local：本地为基底，云端有而本地没有的条目补进来。
+  // 按 id 合并两个数组：保留 a 的全部，补入 b 中 a 没有的（按 id 去重）；无 id 的项补到末尾。
+  function unionById(a, b) {
+    const arrA = Array.isArray(a) ? a : [];
+    const arrB = Array.isArray(b) ? b : [];
+    const ids = new Set(arrA.filter((x) => x && x.id).map((x) => x.id));
+    const add = arrB.filter((x) => x && x.id && !ids.has(x.id));
+    const noId = arrB.filter((x) => x && !x.id).map((x) => Object.assign({}, x, { id: 'm' + Math.random().toString(36).slice(2, 8) }));
+    return arrA.concat(add).concat(noId);
+  }
+
+  // 单模块数据合并（云端 cloud 与本地 local 取并集，绝不互相覆盖/清空）
+  function mergeModule(key, local, cloud) {
+    if (cloud == null) return local;
+    if (local == null) return cloud;
+    if (key === 'ledger') {
+      const li = typeof local.init === 'number' ? local.init : 0;
+      const ci = typeof cloud.init === 'number' ? cloud.init : 0;
+      return { init: Math.max(li, ci), records: unionById(local.records, cloud.records) };
+    }
+    if (key === 'novelnotes') return { books: unionById(local.books, cloud.books) };
+    if (key === 'mood') {
+      const out = Object.assign({}, local);
+      Object.keys(cloud).forEach((d) => {
+        if (!out[d]) { out[d] = cloud[d]; return; }
+        out[d] = Object.assign({}, out[d]);
+        out[d].items = unionById(out[d].items, cloud[d].items);
+      });
+      return out;
+    }
+    if (key === 'sticky') return unionById(local, cloud);
+    return local; // 兜底：保留本地，绝不丢
+  }
+
+  // 把云端 stores 安全合并到本地 localStorage（并集：云端有就用云端补本地，云端无则保留本地）
+  function apply(remote) {
+    if (!remote || !remote.stores) return 0;
+    let n = 0;
+    const s = remote.stores;
+    [['mood', 'mood.v1'], ['ledger', 'ledger.v1'], ['novelnotes', 'novelnotes.v1'], ['sticky', 'sticky.v1']].forEach(([k, key]) => {
+      const cloudData = (s[k] && s[k].data != null) ? s[k].data : null;
+      const merged = mergeModule(k, read(key), cloudData);
+      if (merged != null) { write(key, merged); n++; }
+    });
+    if (s.checkin) {
+      const c = s.checkin;
+      if (c.habits != null) { write('checkin.habits.v1', unionById(read('checkin.habits.v1'), c.habits)); n++; }
+      if (c.records != null) {
+        const m = Object.assign({}, read('checkin.records.v1') || {});
+        Object.keys(c.records || {}).forEach((d) => { m[d] = Object.assign({}, m[d] || {}, c.records[d]); });
+        write('checkin.records.v1', m); n++;
+      }
+      if (c.archived != null) { write('checkin.archived.v1', unionById(read('checkin.archived.v1'), c.archived)); n++; }
+    }
+    return n;
+  }
+
+  // 推送时：以本地为基底，把云端独有的数据并进来（相加合并，云端不会覆盖掉本地）
   function mergeStores(base, local) {
     const out = JSON.parse(JSON.stringify(local));
-    // 通用：本地没有但云端有 → 用云端（防止空设备覆盖掉云端数据）
     ['mood', 'ledger', 'novelnotes', 'sticky'].forEach((k) => {
-      const bHas = base[k] && base[k].data != null;
-      const lHas = out[k] && out[k].data != null;
-      if (bHas && !lHas) out[k] = JSON.parse(JSON.stringify(base[k]));
+      const cloudData = (base[k] && base[k].data != null) ? base[k].data : null;
+      const localData = (out[k] && out[k].data != null) ? out[k].data : null;
+      out[k] = { ts: Date.now(), data: mergeModule(k, localData, cloudData) };
     });
-    if (base.checkin && local.checkin) {
+    if (base.checkin && out.checkin) {
       ['habits', 'records', 'archived'].forEach((k) => {
-        if (base.checkin[k] != null && out.checkin[k] == null) out.checkin[k] = JSON.parse(JSON.stringify(base.checkin[k]));
+        if (base.checkin[k] == null) return;
+        if (k === 'records') {
+          const m = Object.assign({}, out.checkin[k] || {});
+          Object.keys(base.checkin[k] || {}).forEach((d) => { m[d] = Object.assign({}, m[d] || {}, base.checkin[k][d]); });
+          out.checkin[k] = m;
+        } else {
+          out.checkin[k] = unionById(out.checkin[k], base.checkin[k]);
+        }
       });
-    }
-    // 记账：记录按 id 合并（不丢任何一笔）；初始存款取较大值
-    const bLed = base.ledger && base.ledger.data;
-    const lLed = local.ledger && local.ledger.data;
-    if (bLed && lLed && out.ledger && out.ledger.data) {
-      const ids = new Set((out.ledger.data.records || []).map((r) => r.id));
-      (bLed.records || []).forEach((r) => { if (r && r.id && !ids.has(r.id)) out.ledger.data.records.push(r); });
-      const bi = typeof bLed.init === 'number' ? bLed.init : 0;
-      const li = typeof out.ledger.data.init === 'number' ? out.ledger.data.init : 0;
-      out.ledger.data.init = Math.max(bi, li);
     }
     return out;
   }
@@ -177,6 +233,13 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
       dirty = true;
       scheduleAutoPush();
     },
+    collect,
+    read,
+    write,
+    unionById,
+    mergeModule,
+    mergeStores,
+    apply,
   };
 })();
 
@@ -205,63 +268,11 @@ App.registerFeature({
       if (val == null) localStorage.removeItem(key);
       else localStorage.setItem(key, JSON.stringify(val));
     }
-    function collect() {
-      return {
-        v: 1,
-        ts: Date.now(),
-        stores: {
-          mood:       { ts: Date.now(), data: read('mood.v1') },
-          ledger:     { ts: Date.now(), data: read('ledger.v1') },
-          novelnotes: { ts: Date.now(), data: read('novelnotes.v1') },
-          sticky:     { ts: Date.now(), data: read('sticky.v1') },
-          checkin: {
-            ts: Date.now(),
-            habits:   read('checkin.habits.v1'),
-            records:  read('checkin.records.v1'),
-            archived: read('checkin.archived.v1'),
-          },
-        },
-      };
-    }
-    // 合并云端 base 与本地 local
-    function mergeStores(base, local) {
-      const out = JSON.parse(JSON.stringify(local));
-      ['mood', 'ledger', 'novelnotes', 'sticky'].forEach((k) => {
-        const bHas = base[k] && base[k].data != null;
-        const lHas = out[k] && out[k].data != null;
-        if (bHas && !lHas) out[k] = JSON.parse(JSON.stringify(base[k]));
-      });
-      if (base.checkin && local.checkin) {
-        ['habits', 'records', 'archived'].forEach((k) => {
-          if (base.checkin[k] != null && out.checkin[k] == null) out.checkin[k] = JSON.parse(JSON.stringify(base.checkin[k]));
-        });
-      }
-      const bLed = base.ledger && base.ledger.data;
-      const lLed = local.ledger && local.ledger.data;
-      if (bLed && lLed && out.ledger && out.ledger.data) {
-        const ids = new Set((out.ledger.data.records || []).map((r) => r.id));
-        (bLed.records || []).forEach((r) => { if (r && r.id && !ids.has(r.id)) out.ledger.data.records.push(r); });
-        const bi = typeof bLed.init === 'number' ? bLed.init : 0;
-        const li = typeof out.ledger.data.init === 'number' ? out.ledger.data.init : 0;
-        out.ledger.data.init = Math.max(bi, li);
-      }
-      return out;
-    }
-    function apply(remote) {
-      if (!remote || !remote.stores) return 0;
-      let n = 0;
-      const s = remote.stores;
-      if (s.mood       != null) { write('mood.v1',              s.mood.data   != null ? s.mood.data   : s.mood); n++; }
-      if (s.ledger     != null) { write('ledger.v1',            s.ledger.data != null ? s.ledger.data : s.ledger); n++; }
-      if (s.novelnotes != null) { write('novelnotes.v1',        s.novelnotes.data != null ? s.novelnotes.data : s.novelnotes); n++; }
-      if (s.sticky    != null) { write('sticky.v1',           s.sticky.data    != null ? s.sticky.data    : s.sticky);    n++; }
-      if (s.checkin) {
-        if (s.checkin.habits   != null) { write('checkin.habits.v1',   s.checkin.habits);   n++; }
-        if (s.checkin.records  != null) { write('checkin.records.v1',  s.checkin.records);  n++; }
-        if (s.checkin.archived != null) { write('checkin.archived.v1', s.checkin.archived); n++; }
-      }
-      return n;
-    }
+    function collect() { return window.Sync.collect(); }
+    // 合并云端 base 与本地 local（相加合并，见 window.Sync.mergeStores）
+    function mergeStores(base, local) { return window.Sync.mergeStores(base, local); }
+    // 把云端安全合并到本地（并集，绝不把本地覆盖成 null）—— 见 window.Sync.apply
+    function apply(remote) { return window.Sync.apply(remote); }
     async function api(method, url, body) {
       const res = await fetch(url, {
         method,
