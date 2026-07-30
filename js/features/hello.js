@@ -7,14 +7,13 @@ App.registerFeature({
   title: '你好',
   desc: '一个简单的示例页面',
   icon: '👋',
-  color: '#4f46e5',
+  color: '#93a3ad',
   render(container) {
     container.innerHTML =
       '<div class="hero">' +
       '  <div class="hero-emoji">👋</div>' +
-      '  <h2>欢迎使用你的专属应用</h2>' +
-      '  <p>这是第一个示例功能。你可以在 <code>js/features/</code> 里添加自己的功能。</p>' +
-      '  <button class="btn" id="hello-btn">点我打招呼</button>' +
+      '  <h2>你好</h2>' +
+      '  <button class="btn" id="hello-btn">打个招呼</button>' +
       '  <p id="hello-out" class="muted"></p>' +
       '</div>';
     container.querySelector('#hello-btn').addEventListener('click', () => {

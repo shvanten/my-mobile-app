@@ -7,7 +7,7 @@ App.registerFeature({
   title: '待办清单',
   desc: '本地保存的待办事项',
   icon: '✅',
-  color: '#16a34a',
+  color: '#97a98c',
   render(container) {
     const KEY = 'myapp.todo';
     let items = [];

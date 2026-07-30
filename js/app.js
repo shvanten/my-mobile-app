@@ -55,6 +55,8 @@
   function renderHome() {
     titleEl.textContent = '我的应用';
     backBtn.hidden = true;
+    view.className = 'home-view';
+    view.style.removeProperty('--accent');
 
     const grid = document.createElement('div');
     grid.className = 'grid';
@@ -62,22 +64,21 @@
     features.forEach((f) => {
       const card = document.createElement('button');
       card.className = 'card';
-      card.style.setProperty('--accent', f.color || '#4f46e5');
+      card.style.setProperty('--accent', f.color || '#9aa7ad');
+      // 简洁为主：首页卡片只保留图标 + 名称，不显示描述
       card.innerHTML =
         '<span class="card-icon">' + (f.icon || '📱') + '</span>' +
-        '<span class="card-title">' + escapeHtml(f.title || f.id) + '</span>' +
-        '<span class="card-desc">' + escapeHtml(f.desc || '') + '</span>';
+        '<span class="card-title">' + escapeHtml(f.title || f.id) + '</span>';
       card.addEventListener('click', () => navigate(f.id));
       grid.appendChild(card);
     });
 
-    // 「添加功能」说明卡
+    // 「添加功能」说明卡：仅一个 ➕ 与一个极简标签
     const add = document.createElement('button');
     add.className = 'card card-add';
     add.innerHTML =
       '<span class="card-icon">➕</span>' +
-      '<span class="card-title">添加功能</span>' +
-      '<span class="card-desc">在 js/features 里新建文件</span>';
+      '<span class="card-title">添加</span>';
     add.addEventListener('click', showAddHint);
     grid.appendChild(add);
 
@@ -90,6 +91,9 @@
     if (!f) { navigate(); return; }
     titleEl.textContent = f.title || f.id;
     backBtn.hidden = false;
+    // 进入功能页：把该功能的主色注入整个界面，全页同色系
+    view.className = 'feature-view';
+    view.style.setProperty('--accent', f.color || '#9aa7ad');
     view.innerHTML = '';
     const content = document.createElement('div');
     content.className = 'feature';
