@@ -21,7 +21,7 @@ App.registerFeature({
       } catch (e) {}
       return { init: 0, records: [] };
     }
-    function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+    function save() { localStorage.setItem(KEY, JSON.stringify(state)); if (window.Sync) Sync.markDirty(); }
 
     let state = load();
     if (!Array.isArray(state.records)) state.records = [];

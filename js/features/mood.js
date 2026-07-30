@@ -18,7 +18,7 @@ App.registerFeature({
     function load() {
       try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
     }
-    function save() { localStorage.setItem(KEY, JSON.stringify(data)); }
+    function save() { localStorage.setItem(KEY, JSON.stringify(data)); if (window.Sync) Sync.markDirty(); }
 
     let data = load();   // { 'YYYY-MM-DD': { list:['😊',...], note:'...' } }
 

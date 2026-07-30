@@ -80,7 +80,7 @@ App.registerFeature({
       } catch (e) { /* ignore */ }
       return { books: [] };
     }
-    function save() { localStorage.setItem(KEY, JSON.stringify(data)); }
+    function save() { localStorage.setItem(KEY, JSON.stringify(data)); if (window.Sync) Sync.markDirty(); }
     let data = load();
 
     const uid = (p) => (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
