@@ -27,6 +27,19 @@ App.registerFeature({
 
     let habits = loadHabits();
     let records = loadRecords();
+    // 清理未来日期的记录（之前可点未来造成的脏数据）
+    (function cleanFutureRecords() {
+      const t = todayStr();
+      let changed = false;
+      Object.keys(records).forEach((hid) => {
+        const r = records[hid];
+        Object.keys(r).forEach((ds) => {
+          if (ds > t) { delete r[ds]; changed = true; }
+        });
+        if (Object.keys(r).length === 0) delete records[hid];
+      });
+      if (changed) saveRecords();
+    })();
 
     // ---------- 工具 ----------
     const pad = (n) => (n < 10 ? '0' + n : '' + n);
@@ -195,19 +208,20 @@ App.registerFeature({
       const isToday = ds === todayStr();
       const locked = !isToday;  // 过去和未来都锁定，只有今天可编辑
       const full = done === h.parts;
+      let html = '';
 
-      let html = '<div class="ci-detail-head">' +
-        '<span class="ci-detail-date">' + ds + '</span>' +
-        '<span class="ci-detail-habit">' + App.escapeHtml(h.icon) + ' ' + App.escapeHtml(h.name) + '</span>' +
-        '<span class="ci-detail-prog">' + done + ' / ' + h.parts + '</span>' +
-        '</div>';
       if (locked) {
         // 锁定日期：只显示一句提示，不展示小任务方框
         html += '<p class="ci-locked">' +
           (isPast(ds) ? '悟已往之不谏，知来者之可追。' : '尚未到来。') +
           '</p>';
       } else {
-        // 只有今天渲染可点击的小任务方框
+        // 只有今天：显示日期/名称/进度 + 可点击的小任务方框
+        html += '<div class="ci-detail-head">' +
+          '<span class="ci-detail-date">' + ds + '</span>' +
+          '<span class="ci-detail-habit">' + App.escapeHtml(h.icon) + ' ' + App.escapeHtml(h.name) + '</span>' +
+          '<span class="ci-detail-prog">' + done + ' / ' + h.parts + '</span>' +
+          '</div>';
         html += '<div class="ci-parts">';
         const labels = (h.labels && h.labels.length === h.parts)
           ? h.labels
