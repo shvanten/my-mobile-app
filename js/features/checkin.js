@@ -49,29 +49,51 @@ App.registerFeature({
       if (changed) saveRecords();
     })();
 
+    // 取某天的记录对象：{ parts:[bool...], done:bool }（done=是否按下确认按钮）
+    // 兼容旧格式（仅数组）自动迁移为对象；不存在返回 null
+    function getEntry(habit, dateStr) {
+      const rec = records[habit.id];
+      if (!rec) return null;
+      const e = rec[dateStr];
+      if (e == null) return null;
+      if (Array.isArray(e)) {
+        const fixed = new Array(habit.parts).fill(false);
+        for (let i = 0; i < Math.min(habit.parts, e.length); i++) fixed[i] = e[i];
+        const entry = { parts: fixed, done: false };
+        rec[dateStr] = entry;
+        return entry;
+      }
+      if (!Array.isArray(e.parts)) e.parts = new Array(habit.parts).fill(false);
+      if (e.parts.length !== habit.parts) {
+        const fixed = new Array(habit.parts).fill(false);
+        for (let i = 0; i < Math.min(habit.parts, e.parts.length); i++) fixed[i] = e.parts[i];
+        e.parts = fixed;
+      }
+      if (typeof e.done !== 'boolean') e.done = false;
+      return e;
+    }
     // 某天完成度：0~1
-    // 今天/未来：全部完成才 =1，否则 0（当天格子不按份数渐变）
-    // 过去：按已完成份数比例（24 点后的部分信用）
+    // 今天/未来：只有「按下确认按钮」后才 =1，否则 0（点亮子任务不会自动驱动日历）
+    // 过去：已确认则全深；未确认（旧数据/无法操作）按已完成份数比例
     function dayDepth(habit, dateStr) {
-      const arr = (records[habit.id] && records[habit.id][dateStr]) || [];
-      const done = arr.filter(Boolean).length;
-      if (isPast(dateStr)) return habit.parts ? done / habit.parts : 0;
-      return done === habit.parts ? 1 : 0;
+      const e = getEntry(habit, dateStr);
+      if (!e) return 0;
+      const done = e.parts.filter(Boolean).length;
+      if (isPast(dateStr)) return e.done ? 1 : (habit.parts ? done / habit.parts : 0);
+      return e.done ? 1 : 0;
     }
     function getDayArr(habit, dateStr) {
       const rec = records[habit.id] || (records[habit.id] = {});
-      if (!rec[dateStr]) rec[dateStr] = new Array(habit.parts).fill(false);
-      if (rec[dateStr].length !== habit.parts) {
-        // 份数变动保护
-        const fixed = new Array(habit.parts).fill(false);
-        for (let i = 0; i < Math.min(habit.parts, rec[dateStr].length); i++) fixed[i] = rec[dateStr][i];
-        rec[dateStr] = fixed;
-      }
-      return rec[dateStr];
+      if (!rec[dateStr]) rec[dateStr] = { parts: new Array(habit.parts).fill(false), done: false };
+      return getEntry(habit, dateStr).parts;
+    }
+    function isDayDone(habit, dateStr) {
+      const e = getEntry(habit, dateStr);
+      return !!(e && e.done);
     }
     function todayDoneCount(habit) {
-      const arr = (records[habit.id] && records[habit.id][todayStr()]) || [];
-      return arr.filter(Boolean).length;
+      const e = getEntry(habit, todayStr());
+      return e ? e.parts.filter(Boolean).length : 0;
     }
     function monthFullDays(habit, year, month) {
       let n = 0;
@@ -215,12 +237,14 @@ App.registerFeature({
           (isPast(ds) ? '悟已往之不谏，知来者之可追。' : '尚未到来。') +
           '</p>';
       } else {
-        // 只有今天：默认显示可点击的小任务方框；全部完成后整块变成深绿圆按钮（不再显示方框）
+        // 只有今天：默认显示可点击的小任务方框；全部点亮后出现圆形「确认按钮」
         const done = arr.filter(Boolean).length;
         const allDone = done === h.parts;
         if (allDone) {
-          // 全部完成：圆形按钮 + ✓ 标记；子任务方框在 CSS 里 display:none
-          html += '<div class="ci-parts all-done" role="button" tabindex="0" aria-label="今日已完成，点击取消">' +
+          // 全部点亮：先显示浅色「待确认」按钮；按下才变深并加深日历
+          const confirmed = isDayDone(h, ds);
+          html += '<div class="ci-parts all-done' + (confirmed ? ' confirmed' : '') + '" role="button" tabindex="0" ' +
+            'aria-label="' + (confirmed ? '今日已完成，点击取消' : '小任务已全部完成，点击确认打卡') + '">' +
             '<span class="ci-done-mark">✓</span>' +
             '</div>';
         } else {
@@ -277,17 +301,24 @@ App.registerFeature({
     });
 
     detailEl.addEventListener('click', (e) => {
-      // 全部完成的圆形按钮：点击取消今天的全勤
+      // 圆形「确认按钮」：pending 时按下=确认（变深 + 日历加深）；confirmed 时按下=取消
       const allDoneEl = e.target.closest('.ci-parts.all-done');
       if (allDoneEl) {
         const h = selHabit();
         if (!h || selDate !== todayStr()) return;
-        const arr = getDayArr(h, selDate);
-        if (!arr.every(Boolean)) return;  // 防御：必须当前确实全完成
-        arr.fill(false);
-        saveRecords();
-        paintCalendar(); paintDetail();
-        App.toast('已取消完成');
+        const entry = getEntry(h, selDate);
+        if (!entry) return;
+        if (entry.done) {
+          entry.done = false;       // 取消确认：按钮回浅色，日历回浅
+          saveRecords();
+          paintCalendar(); paintDetail();
+          App.toast('已取消完成');
+        } else {
+          entry.done = true;        // 确认：按钮变深 + 对应日期颜色变深
+          saveRecords();
+          paintCalendar(); paintDetail();
+          App.toast('已完成打卡 ✓');
+        }
         return;
       }
       const p = e.target.closest('[data-i]');
@@ -299,10 +330,9 @@ App.registerFeature({
       arr[i] = !arr[i];
       saveRecords();
       const done = arr.filter(Boolean).length;
-      // 日历格子只在"全部完成"那一刻才更新；小任务进度不自动驱动日历颜色
-      if (done === h.parts) paintCalendar();
+      // 小任务进度不自动驱动日历颜色（要等按下确认按钮）；只重渲详情
       paintDetail();
-      if (done === h.parts) App.toast('今天「' + h.name + '」全部完成 🎉');
+      if (done === h.parts) App.toast('小任务已全部完成，点下方按钮确认打卡');
     });
 
     // 圆形按钮的键盘支持（tabindex=0 + Enter/Space）
