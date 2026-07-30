@@ -27,6 +27,14 @@ App.registerFeature({
 
     let habits = loadHabits();
     let records = loadRecords();
+
+    // ---------- 工具 ----------
+    const pad = (n) => (n < 10 ? '0' + n : '' + n);
+    function fmt(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+    function todayStr() { return fmt(new Date()); }
+    function isPast(dateStr) { return dateStr < todayStr(); }      // 早于今天 → 已锁定（过了 0 点）
+    function isFuture(dateStr) { return dateStr > todayStr(); }
+
     // 清理未来日期的记录（之前可点未来造成的脏数据）
     (function cleanFutureRecords() {
       const t = todayStr();
@@ -40,13 +48,6 @@ App.registerFeature({
       });
       if (changed) saveRecords();
     })();
-
-    // ---------- 工具 ----------
-    const pad = (n) => (n < 10 ? '0' + n : '' + n);
-    function fmt(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
-    function todayStr() { return fmt(new Date()); }
-    function isPast(dateStr) { return dateStr < todayStr(); }      // 早于今天 → 已锁定（过了 0 点）
-    function isFuture(dateStr) { return dateStr > todayStr(); }
 
     // 某天完成度：0~1
     // 今天/未来：全部完成才 =1，否则 0（当天格子不按份数渐变）
