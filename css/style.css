@@ -1,48 +1,52 @@
 /* ============================================================
-   莫兰迪色系 · 手机应用框架样式
-   - 整体暖灰中性底，低饱和、低对比
-   - 每个功能块只用一个主色调，界面内均为同系深浅
-   - 去多余文字，留简洁留白，辅以同色系柔和点阵/光晕
+   绿色主调 · 手机应用框架样式
+   - 主界面以绿色为主色调，由浅到深分层：
+       背景 < 卡片 < 输入框/框 < 按钮 < 标题
+   - 饱和度适中偏低，清晰不刺眼，同一色系深浅搭配
    ============================================================ */
 
 :root {
-  --bg: #e9ebe4;
-  --surface: #f4f6f1;
-  --surface-2: #eef1ea;
-  --text: #4a4f44;
-  --text-strong: #33382f;
-  --muted: #9aa090;
-  --border: #d6dccb;
+  /* —— 层次底色（由浅到深）—— */
+  --bg: #e9f0e6;
+  --surface: #f5f9f2;
+  --surface-2: #e3ecdf;
+  --text: #2c3a30;
+  --text-strong: #1d2a21;
+  --muted: #7c9082;
+  --border: #c6dacb;
 
   --radius: 22px;
   --radius-sm: 14px;
-  --shadow: 0 10px 30px rgba(74, 66, 56, .10);
-  --shadow-sm: 0 3px 12px rgba(74, 66, 56, .08);
+  --shadow: 0 10px 30px rgba(40, 70, 50, .10);
+  --shadow-sm: 0 3px 12px rgba(40, 70, 50, .08);
 
-  /* 默认主色（莫兰迪绿），功能页会按功能覆盖 */
-  --accent: #97a98c;
-  --accent-soft: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  /* —— 绿色主色与深浅派生 —— */
+  --accent: #6b9b7a;                                  /* 主绿（中明度） */
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--surface));
   --accent-faint: color-mix(in srgb, var(--accent) 9%, var(--surface));
-  --accent-deep: color-mix(in srgb, var(--accent) 64%, #2a2620);
-  --on-accent: #fbf9f5;
+  --accent-deep: #3c6650;                            /* 深绿：按钮 / 标题 / 强调 */
+  --on-accent: #f5f9f2;                              /* 深绿按钮上的浅字 */
+  --chip: var(--accent-deep);                        /* 图标块用深绿，拉层次 */
 }
 
 html[data-theme="dark"] {
-  --bg: #252a25;
-  --surface: #2e332e;
-  --surface-2: #343a34;
-  --text: #e3e8df;
-  --text-strong: #f0f4ec;
-  --muted: #98a090;
-  --border: #3e443e;
+  --bg: #16201a;
+  --surface: #1d2a22;
+  --surface-2: #243029;
+  --text: #d7e4da;
+  --text-strong: #eaf3ec;
+  --muted: #8aa090;
+  --border: #314338;
 
-  --shadow: 0 10px 30px rgba(0, 0, 0, .38);
-  --shadow-sm: 0 3px 12px rgba(0, 0, 0, .3);
+  --shadow: 0 10px 30px rgba(0, 0, 0, .4);
+  --shadow-sm: 0 3px 12px rgba(0, 0, 0, .32);
 
-  --accent-soft: color-mix(in srgb, var(--accent) 24%, var(--surface));
-  --accent-faint: color-mix(in srgb, var(--accent) 14%, var(--surface));
-  --accent-deep: color-mix(in srgb, var(--accent) 58%, #f3eee4);
-  --on-accent: #2a2723;
+  --accent: #74b189;
+  --accent-soft: color-mix(in srgb, var(--accent) 22%, var(--surface));
+  --accent-faint: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  --accent-deep: #a9d8bb;
+  --on-accent: #16201a;
+  --chip: var(--accent-deep);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -65,7 +69,7 @@ body {
   background: var(--bg);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 0 50px rgba(74, 66, 56, .06);
+  box-shadow: 0 0 50px rgba(40, 70, 50, .06);
 }
 
 /* 顶部柔光，淡淡的同色调氛围 */
@@ -75,7 +79,7 @@ body {
   top: -120px; left: 50%;
   width: 360px; height: 360px;
   transform: translateX(-50%);
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
   pointer-events: none;
 }
 
@@ -138,7 +142,7 @@ body {
   gap: 16px;
 }
 .card {
-  --accent: #97a98c;
+  --accent: #6b9b7a;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -148,7 +152,7 @@ body {
   min-height: 116px;
   border-radius: var(--radius);
   background: var(--accent-faint);
-  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   color: var(--text);
@@ -163,7 +167,7 @@ body {
   right: -30px; bottom: -30px;
   width: 90px; height: 90px;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%);
   pointer-events: none;
 }
 .card:active { transform: scale(.96); box-shadow: var(--shadow); }
@@ -174,8 +178,8 @@ body {
   display: grid;
   place-items: center;
   font-size: 24px;
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-deep) 30%, transparent);
 }
 .card-title {
   font-weight: 700;
@@ -190,7 +194,7 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  --accent: #9aa890;
+  --accent: #8aa890;
   background: transparent;
   border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent);
   box-shadow: none;
@@ -209,7 +213,7 @@ body {
 /* ---------- 功能页：同色系氛围 ---------- */
 #view.feature-view {
   background:
-    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
+    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 62%),
     var(--bg);
 }
 /* 同色系细点阵 */
@@ -226,7 +230,7 @@ body {
 .feature { animation: fade .28s ease; position: relative; z-index: 1; }
 @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-/* 功能页头图：emoji 落在一个同色系柔光圆环里 */
+/* 功能页头图：emoji 落在一个同色系浅绿圆环里 */
 .hero { text-align: center; padding: 30px 8px 22px; }
 .hero-emoji {
   width: 92px; height: 92px;
@@ -251,7 +255,7 @@ body {
 .muted { color: var(--muted); font-size: 13px; letter-spacing: .5px; }
 code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-size: 12px; color: var(--text); }
 
-/* 按钮：同色系实底 + 同系深一档文字，保持单色 */
+/* 按钮：深绿实底 + 浅字，明显深于卡片，拉开层次 */
 .btn {
   border: none;
   background: var(--accent-deep);
@@ -262,25 +266,27 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent-deep) 28%, transparent);
   transition: transform .12s ease, opacity .15s ease;
 }
-.btn:active { transform: scale(.97); opacity: .9; }
+.btn:active { transform: scale(.97); opacity: .92; }
 
-/* ---------- 待办清单（单一色系） ---------- */
+/* ---------- 待办清单（绿色深浅层次） ---------- */
 .todo-form { display: flex; gap: 10px; margin-bottom: 16px; }
 .todo-form input {
   flex: 1;
   padding: 13px 15px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-2);
   color: var(--text);
   font-size: 15px;
-  transition: border-color .15s ease, box-shadow .15s ease;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
 .todo-form input::placeholder { color: var(--muted); }
 .todo-form input:focus {
   outline: none;
+  background: var(--surface);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
@@ -289,8 +295,8 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: var(--accent-faint);
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  background: var(--surface-2);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
   border-radius: var(--radius-sm);
   padding: 12px 14px;
   transition: background .2s ease;
@@ -311,24 +317,25 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 }
 .todo-item .del:active { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); }
 
-/* ---------- 随手记（单一色系） ---------- */
+/* ---------- 随手记（绿色深浅层次） ---------- */
 .notes-area {
   width: 100%;
   min-height: 52vh;
   padding: 16px;
   border-radius: var(--radius);
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
-  background: var(--accent-faint);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  background: var(--surface-2);
   color: var(--text);
   font-size: 15px;
   line-height: 1.7;
   resize: vertical;
   font-family: inherit;
-  transition: border-color .15s ease, box-shadow .15s ease;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
 }
 .notes-area::placeholder { color: var(--muted); }
 .notes-area:focus {
   outline: none;
+  background: var(--surface);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
