@@ -447,13 +447,22 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   border-radius: var(--radius);
   transition: background .35s ease, border-color .35s ease, box-shadow .35s ease;
 }
-/* 全部完成后：从小任务条 → 圆角正方形 → 圆形按钮 的 morph 动画。
-   最终态：84px 圆；pending 为浅色，confirmed 加 .confirmed 类切换为深色
-   （仅色彩/阴影过渡，不再跑 morph）。 */
+/* 全部完成后：从小任务条 → 圆角正方形 的 morph 动画。
+   最终停在 84px 圆角正方形（不变成圆形）；pending 浅色，confirmed 切换深色。 */
 .ci-parts.all-done {
+  width: 84px;
+  height: 84px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 18px;
+  background: var(--accent-soft);
+  border-color: var(--accent-deep);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-deep) 18%, transparent);
   cursor: pointer;
   user-select: none;
   margin: 0 auto;
+  display: grid;
+  place-items: center;
   animation: ci-morph .9s cubic-bezier(.45, 0, .25, 1) forwards;
 }
 .ci-parts.all-done.confirmed {
@@ -465,9 +474,9 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .ci-parts.all-done:active { transform: scale(.96); }
 /* morph 关键帧：
    - 0% 大框 + 小任务排列（与默认态一致）
-   - 35% 大框收成竖长方形（高度 ≈ 圆按钮直径）；小任务此刻已淡出
+   - 35% 大框收成竖长方形（高度 ≈ 按钮直径）；小任务此刻已淡出
    - 70% 已是 84×84 的圆角正方形（accent-soft 底）
-   - 100% border-radius 收成 50% 成为圆形 */
+   - 100% 停在圆角正方形（border-radius 18px），不再变成圆形 */
 @keyframes ci-morph {
   0% {
     width: 100%;
@@ -509,7 +518,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
     width: 84px;
     height: 84px;
     padding: 0;
-    border-radius: 50%;
+    border-radius: 18px;
     background: var(--accent-soft);
     border-color: var(--accent-deep);
     box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-deep) 18%, transparent);
