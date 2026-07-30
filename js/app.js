@@ -106,6 +106,7 @@
   }
 
   function render() {
+    buildSidebar();
     const route = parseRoute();
     if (route.name === 'feature') renderFeature(route.id);
     else renderHome();
@@ -132,7 +133,8 @@
   }
 
   // ===== 启动 =====
-  buildSidebar();
+  // 注意：buildSidebar 必须等所有功能模块执行完 registerFeature 后才能正确读取 features 数组，
+  // 因此放进 render()（在 DOMContentLoaded / hashchange 时统一调用），不要在这里直接调。
   document.getElementById('theme-btn').addEventListener('click', toggleTheme);
   document.getElementById('nav-add').addEventListener('click', showAddHint);
   window.addEventListener('hashchange', render);
