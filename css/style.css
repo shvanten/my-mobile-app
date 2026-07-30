@@ -359,3 +359,137 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 @media (min-width: 1100px) {
   .feature { max-width: 760px; }
 }
+
+/* ============================================================
+   打卡功能：日历 + 可视化打卡（绿色同系、深浅分层）
+   ============================================================ */
+.ci-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.ci-head h2 { font-size: 22px; color: var(--text-strong); margin: 0; }
+
+.ci-habits { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px; -webkit-overflow-scrolling: touch; }
+.ci-habits::-webkit-scrollbar { height: 0; }
+.ci-habit {
+  flex: 0 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  min-width: 80px; padding: 12px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, transform .1s ease;
+}
+.ci-habit:active { transform: scale(.97); }
+.ci-habit.active {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  border-color: var(--accent);
+}
+.ci-habit-ic { font-size: 24px; line-height: 1; }
+.ci-habit-name { font-size: 13px; color: var(--text); max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ci-habit-prog { font-size: 12px; color: var(--muted); }
+.ci-empty { color: var(--muted); font-size: 14px; padding: 8px 2px; }
+
+.ci-cal { margin-bottom: 18px; }
+.ci-cal-head { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 10px; }
+.ci-cal-title { font-size: 16px; color: var(--text-strong); min-width: 118px; text-align: center; }
+.ci-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
+.ci-week span { text-align: center; font-size: 12px; color: var(--muted); }
+.ci-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+
+.ci-day {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) calc(var(--depth, 0) * 70%), var(--surface-2));
+  color: var(--text);
+  font-size: 15px;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s ease, transform .1s ease;
+}
+.ci-day:active { transform: scale(.95); }
+.ci-day.empty { background: transparent; border: none; cursor: default; }
+.ci-day.today { border-color: var(--accent); }
+.ci-day.selected { box-shadow: 0 0 0 2px var(--accent-deep); }
+.ci-day.full { color: #fff; }
+.ci-day-num { position: relative; z-index: 1; }
+.ci-day-fill {
+  position: absolute; left: 0; bottom: 0; height: 4px;
+  width: calc(var(--depth, 0) * 100%);
+  background: var(--accent-deep);
+  opacity: .85;
+}
+.ci-day.full .ci-day-fill { opacity: 0; }
+
+.ci-stat { text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px; }
+.ci-stat b { color: var(--accent-deep); }
+
+.ci-detail {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.ci-detail-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.ci-detail-date { font-size: 13px; color: var(--muted); }
+.ci-detail-habit { font-size: 16px; color: var(--text-strong); flex: 1; }
+.ci-detail-prog { font-size: 14px; color: var(--accent-deep); font-weight: 600; }
+.ci-locked { font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.ci-parts { display: flex; flex-wrap: wrap; gap: 12px; }
+.ci-part {
+  width: 56px; height: 56px; border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; opacity: .5;
+  transition: opacity .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.ci-part.on {
+  opacity: 1;
+  background: color-mix(in srgb, var(--accent) 30%, var(--surface));
+  border-color: var(--accent);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.ci-parts.locked .ci-part { cursor: default; }
+.ci-done-tip { text-align: center; color: var(--accent-deep); font-size: 14px; margin: 12px 0 0; }
+
+.ci-modal {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(20, 30, 22, .45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.ci-modal[hidden] { display: none; }
+.ci-modal-box {
+  width: 100%; max-width: 360px;
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .3);
+}
+.ci-modal-box h3 { margin: 0 0 16px; color: var(--text-strong); font-size: 18px; }
+.ci-field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.ci-field > span { font-size: 13px; color: var(--muted); }
+.ci-field input {
+  padding: 12px 13px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-size: 15px;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.ci-field input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.ci-icons { display: flex; flex-wrap: wrap; gap: 8px; }
+.ci-ic {
+  width: 42px; height: 42px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface-2);
+  font-size: 20px; cursor: pointer;
+  transition: all .15s ease;
+}
+.ci-ic.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--surface-2)); }
+.ci-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+.btn.ghost { background: transparent; color: var(--text); box-shadow: none; border: 1px solid var(--border); }
+.btn.ghost:active { background: var(--surface-2); }
