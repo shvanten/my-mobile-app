@@ -432,7 +432,11 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 }
 
 /* 连续网格：把多个月拼成一张 7 列连续日历（月份标签列 + 日一二三四五六）。
-   每个月首尾直接相连、不留空；月份之间的弯折虚线由 drawSeparators 绘制。 */
+   外层 .ci-grid-wrap 是 position:relative 的滚动内容容器，月份标签作为它的绝对定位子元素，
+   这样标签会跟随日期网格一起滚动（之前直接挂到日历小窗上时是钉死在视口里、不会随内容滚）。 */
+.ci-grid-wrap {
+  position: relative;
+}
 .ci-grid {
   display: grid;
   grid-template-columns: 32px repeat(7, 1fr);
@@ -474,23 +478,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   line-height: 1;
 }
 
-/* 月份之间的虚线分隔改用 SVG 弯折线绘制（见 drawSeparators） */
-.ci-sep {
-  position: absolute;
-  top: 0; left: 0;
-  pointer-events: none;
-  overflow: visible;
-  z-index: 2;
-}
-.ci-sep-path {
-  fill: none;
-  stroke: color-mix(in srgb, var(--accent-deep) 42%, transparent);
-  stroke-width: 1;
-  stroke-dasharray: 4 4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
+/* 月份之间的虚线分隔已移除（用户不需要） */
 .ci-day {
   position: relative;
   aspect-ratio: 1 / 1;

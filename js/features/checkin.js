@@ -214,7 +214,7 @@ App.registerFeature({
       while (cells.length % 7 !== 0) cells.push(null);   // 末尾补满成整行
       const rows = cells.length / 7;
       const t = todayStr();
-      let body = '<div class="ci-grid">';
+      let body = '<div class="ci-grid-wrap"><div class="ci-grid">';
       for (let r = 0; r < rows; r++) {
         const row = cells.slice(r * 7, (r + 1) * 7);
         // 左侧 32px 月份标签列：仅作占位（保持网格列宽）；月份文字由 drawMonthLabels 以竖向居中方式绘制
@@ -238,9 +238,8 @@ App.registerFeature({
             '</button>';
         }
       }
-      body += '</div>';
+      body += '</div></div>';
       calEl.innerHTML = headHtml + body;
-      drawSeparators();
       drawMonthLabels();
     }
     // 只更新某一天格子的完成度（不重渲整片日历，避免确认打卡时日历跳动）
@@ -253,70 +252,16 @@ App.registerFeature({
       btn.style.setProperty('--depth', depth);
       btn.classList.toggle('full', depth >= 1);
     }
-    // 在月份交界处绘制"可弯折"虚线：沿上一月最后一天的下边缘 → 下一月首天左缘向下弯 → 下一月首行的上边缘
-    function drawSeparators() {
-      const old = calEl.querySelector('.ci-sep');
-      if (old) old.remove();
-      if (!calEl.isConnected) return;
-      // 取全部有内容的日期按钮，按 年-月 分组（连续网格里每个月天然成一组）
-      const days = Array.from(calEl.querySelectorAll('.ci-grid .ci-day:not(.empty)'));
-      if (days.length < 2) return;
-      const months = [];
-      days.forEach((btn) => {
-        const key = btn.dataset.y + '-' + btn.dataset.m;
-        let g = months[months.length - 1];
-        if (!g || g.key !== key) { g = { key: key, first: btn, last: btn }; months.push(g); }
-        else { g.last = btn; }
-      });
-      if (months.length < 2) return;
-      const cs = getComputedStyle(calEl);
-      const padL = parseFloat(cs.paddingLeft) || 0;
-      const padT = parseFloat(cs.paddingTop) || 0;
-      const padR = parseFloat(cs.paddingRight) || 0;
-      const padB = parseFloat(cs.paddingBottom) || 0;
-      const borderT = calEl.clientTop || 0;
-      const borderL = calEl.clientLeft || 0;
-      const calRect = calEl.getBoundingClientRect();
-      const W = calEl.scrollWidth - padL - padR;
-      const NS = 'http://www.w3.org/2000/svg';
-      const svg = document.createElementNS(NS, 'svg');
-      svg.setAttribute('class', 'ci-sep');
-      svg.setAttribute('width', W);
-      svg.setAttribute('height', calEl.scrollHeight - padT - padB);
-      svg.style.top = padT + 'px';
-      svg.style.left = padL + 'px';
-      const toContent = (r) => ({
-        top: r.top - calRect.top - borderT - padT + calEl.scrollTop,
-        left: r.left - calRect.left - borderL - padL + calEl.scrollLeft,
-        bottom: r.bottom - calRect.top - borderT - padT + calEl.scrollTop,
-      });
-      let d = '';
-      for (let i = 0; i < months.length - 1; i++) {
-        const aR = toContent(months[i].last.getBoundingClientRect());
-        const bR = toContent(months[i + 1].first.getBoundingClientRect());
-        const yBottomA = aR.bottom;     // 上一月最后一天的下边缘
-        const yTopB = bR.top;           // 下一月第一天所在行的上边缘
-        const xBend = bR.left;          // 下一月首天左缘 = 弯折点
-        d += 'M0 ' + yBottomA +
-             ' L' + xBend + ' ' + yBottomA +
-             ' L' + xBend + ' ' + yTopB +
-             ' L' + W + ' ' + yTopB + ' ';
-      }
-      if (!d) return;
-      const path = document.createElementNS(NS, 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('class', 'ci-sep-path');
-      svg.appendChild(path);
-      calEl.appendChild(svg);
-    }
-    // 在每个月区块的垂直中心、左列绘制竖向居中的月份标签。
-    // 这样即使滚到月末（当月 1 号已滚出顶部），左列对应月份仍清晰可见，不会误显示为下月。
+    // 在每个月区块的垂直中心、左列绘制竖向居中的月份标签（放进 .ci-grid-wrap 内，
+    // 让标签跟随日期网格一起滚动 —— 之前直接挂在日历小窗上，absolute 不随内容滚，导致标签错位）
     function drawMonthLabels() {
-      calEl.querySelectorAll('.ci-mlabel').forEach((e) => e.remove());
+      const wrap = calEl.querySelector('.ci-grid-wrap');
+      if (!wrap) return;
+      wrap.querySelectorAll('.ci-mlabel').forEach((e) => e.remove());
       if (!calEl.isConnected) return;
-      const days = Array.from(calEl.querySelectorAll('.ci-grid .ci-day:not(.empty)'));
+      const days = Array.from(wrap.querySelectorAll('.ci-grid .ci-day:not(.empty)'));
       if (!days.length) return;
-      // 按 年-月 分组，取每个月首/末按钮（与 drawSeparators 同口径）
+      // 按 年-月 分组，取每个月首/末按钮
       const months = [];
       days.forEach((btn) => {
         const key = btn.dataset.y + '-' + btn.dataset.m;
@@ -324,42 +269,45 @@ App.registerFeature({
         if (!g || g.key !== key) { g = { key: key, y: +btn.dataset.y, m: +btn.dataset.m, first: btn, last: btn }; months.push(g); }
         else { g.last = btn; }
       });
-      const cs = getComputedStyle(calEl);
-      const padL = parseFloat(cs.paddingLeft) || 0;
-      const padT = parseFloat(cs.paddingTop) || 0;
-      const borderL = calEl.clientLeft || 0;
-      const borderT = calEl.clientTop || 0;
-      const calRect = calEl.getBoundingClientRect();
+      // 用 wrap 的视口坐标作参考 —— wrap 跟随 calEl 滚动，因此 (btn.top - wrapRect.top)
+      // 即"在 wrap 内的内容偏移"，是稳定的；绝对定位 left:0 + top:cy 就让标签跟着内容一起滚
+      const wrapRect = wrap.getBoundingClientRect();
       months.forEach((mo) => {
         const a = mo.first.getBoundingClientRect();
         const b = mo.last.getBoundingClientRect();
-        const topA = a.top - calRect.top - borderT - padT + calEl.scrollTop;
-        const botB = b.bottom - calRect.top - borderT - padT + calEl.scrollTop;
-        const cy = (topA + botB) / 2;   // 该月区块的垂直中心
+        const cy = (a.top + b.bottom) / 2 - wrapRect.top;   // 每月区块在 wrap 内的垂直中心
         const div = document.createElement('div');
         div.className = 'ci-mlabel';
         div.textContent = (mo.m + 1) + '月';
         div.style.top = cy + 'px';
-        div.style.left = padL + 'px';
-        calEl.appendChild(div);
+        div.style.left = '0px';
+        wrap.appendChild(div);
       });
     }
-    // 窗口尺寸变化时重算虚线位置
-    let sepRaf = 0;
+    // 窗口尺寸变化时重算月份标签位置
+    let monthLabelRaf = 0;
     window.addEventListener('resize', () => {
-      if (sepRaf) cancelAnimationFrame(sepRaf);
-      sepRaf = requestAnimationFrame(() => {
-        if (calEl.isConnected) { drawSeparators(); drawMonthLabels(); }
+      if (monthLabelRaf) cancelAnimationFrame(monthLabelRaf);
+      monthLabelRaf = requestAnimationFrame(() => {
+        if (calEl.isConnected) drawMonthLabels();
       });
     });
-    // 滚动到指定 (年,月) 的首日格子（避开吸顶星期表头）；smooth=true 平滑，false 直接定位
-    function scrollToMonth(y, m, smooth) {
-      const anchor = calEl.querySelector('.ci-day.month-start[data-y="' + y + '"][data-m="' + m + '"]');
-      if (anchor && calEl.scrollTo) {
-        const head = calEl.querySelector('.ci-cal-head');
-        const headH = head ? head.offsetHeight : 0;
-        calEl.scrollTo({ top: Math.max(0, anchor.offsetTop - headH), behavior: smooth ? 'smooth' : 'auto' });
-      }
+    // 把日历滚动到"今天所在行"并居中（首次打开/新项目时使用，避开吸顶星期表头）
+    function scrollToToday() {
+      const cur = todayStr();
+      const anchor = calEl.querySelector('.ci-day[data-date="' + cur + '"]');
+      if (!anchor) return;
+      const headH = (calEl.querySelector('.ci-cal-head') || {}).offsetHeight || 0;
+      const cs = getComputedStyle(calEl);
+      const borderT = calEl.clientTop || 0;
+      const padT = parseFloat(cs.paddingTop) || 0;
+      const calRect = calEl.getBoundingClientRect();
+      const aRect = anchor.getBoundingClientRect();
+      // 今天那行在 calEl 内容中的垂直中心
+      const rowCenterInCal = (aRect.top + aRect.height / 2) - (calRect.top + borderT + padT) + calEl.scrollTop;
+      // 视口中心放在吸顶表头之下：让今天那行居中于"表头底 ~ 小窗底"这段可视区
+      const target = Math.max(0, rowCenterInCal - (calEl.clientHeight + headH) / 2);
+      calEl.scrollTo({ top: target, behavior: 'auto' });
     }
 
     // ---------- 选中某天的明细（下方点亮份数） ----------
@@ -431,13 +379,31 @@ App.registerFeature({
     function refresh() { paintHabits(); paintCalendar(); paintDetail(); }
 
     // ---------- 交互 ----------
+    // 记住每个习惯的日历滚动位置：不同项目的"日历视图"互不干扰
+    const habitScroll = {};
     habitsEl.addEventListener('click', (e) => {
       const b = e.target.closest('[data-id]');
       if (!b) return;
-      selHabitId = b.dataset.id;
-      // 切到该习惯的今天
+      const newId = b.dataset.id;
       selDate = todayStr();
-      refresh();
+      if (newId === selHabitId) {
+        // 点的是当前习惯：只刷新详情，**不重绘日历**（避免滚动位置被重置）
+        paintDetail();
+        return;
+      }
+      // 先记下当前习惯的滚动位置，再切换
+      if (selHabitId) habitScroll[selHabitId] = calEl.scrollTop;
+      selHabitId = newId;
+      paintHabits();
+      paintCalendar();
+      paintDetail();
+      // 还原滚动位置；若是首次打开这个项目，则把"今天那一行"居中
+      if (habitScroll[newId] != null) {
+        calEl.scrollTop = habitScroll[newId];
+      } else {
+        scrollToToday();
+        habitScroll[newId] = calEl.scrollTop;
+      }
     });
 
     calEl.addEventListener('click', (e) => {
@@ -578,8 +544,8 @@ App.registerFeature({
 
     // ---------- 首次渲染 ----------
     refresh();
-    // 进入页面默认定位到现实时间的当前月（直接定位，避免长平滑滚动）
-    const cur = new Date();
-    scrollToMonth(cur.getFullYear(), cur.getMonth(), false);
+    // 把"今天那一行"居中显示在日历小窗中间，并记下滚动位置
+    scrollToToday();
+    if (selHabitId) habitScroll[selHabitId] = calEl.scrollTop;
   }
 });
