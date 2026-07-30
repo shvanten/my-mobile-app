@@ -87,7 +87,7 @@ App.registerFeature({
     function getBook(id) { return data.books.find((b) => b.id === id); }
 
     // ---------- 状态 ----------
-    let view = 'books';           // books | detail | rank
+    let view = 'books';           // books | detail | rank | allQuotes | allAnalyses
     let currentBookId = null;
     let suppressPaint = false;    // 翻书动画期间 阻止 paintBooks 重排
 
@@ -96,10 +96,12 @@ App.registerFeature({
       '<div class="nn">' +
       '  <div class="nn-head" id="nn-head">' +
       '    <h2 id="nn-title">小说拆文</h2>' +
-      '    <div class="nn-tabs" id="nn-tabs">' +
-      '      <button class="nn-tab on" data-view="books" type="button">📚 我的书</button>' +
-      '      <button class="nn-tab" data-view="rank" type="button">📈 榜单</button>' +
-      '    </div>' +
+      '  </div>' +
+      '  <div class="nn-tabs" id="nn-tabs">' +
+      '    <button class="nn-tab on" data-view="books" type="button">📚 我的书</button>' +
+      '    <button class="nn-tab" data-view="allQuotes" type="button">📑 全部摘抄</button>' +
+      '    <button class="nn-tab" data-view="allAnalyses" type="button">💡 全部分析</button>' +
+      '    <button class="nn-tab" data-view="rank" type="button">📈 榜单</button>' +
       '  </div>' +
       '  <div class="nn-body" id="nn-body"></div>' +
       '  <button class="nn-fab" id="nn-fab" type="button" aria-label="新建">＋</button>' +
@@ -116,6 +118,7 @@ App.registerFeature({
       view = b.dataset.view;
       tabsEl.querySelectorAll('.nn-tab').forEach((t) => t.classList.toggle('on', t === b));
       if (view !== 'detail') currentBookId = null;
+      // 只有「我的书」才显示新建按钮
       fabEl.style.display = (view === 'books') ? '' : 'none';
       paint();
     });
@@ -398,7 +401,7 @@ App.registerFeature({
       setTimeout(() => txt.focus(), 60);
     }
 
-    function openItemEditor(book, kind, existing) {
+    function openItemEditor(book, kind, existing, onDone) {
       const isNew = !existing;
       const isA = kind === 'a';
       const title = isA ? '分析条目' : '摘抄条目';
@@ -410,7 +413,8 @@ App.registerFeature({
         } else {
           existing.text = v;
         }
-        save(); paintDetail();
+        save();
+        (onDone || paintDetail)();
         App.toast(isNew ? '已添加' : '已更新');
       }, placeholder);
     }
@@ -485,7 +489,87 @@ App.registerFeature({
       if (view === 'books') paintBooks();
       else if (view === 'detail') paintDetail();
       else if (view === 'rank') paintRank();
+      else if (view === 'allQuotes') paintAll('quotes', '摘抄', '📑');
+      else if (view === 'allAnalyses') paintAll('analyses', '分析', '💡');
     }
     paint();
+
+    // ---------- 全部摘抄 / 全部分析（统一视图，不分书） ----------
+    function paintAll(kind, label, emoji) {
+      const all = [];
+      data.books.forEach((b) => {
+        (b[kind] || []).forEach((it) => all.push({ book: b, item: it }));
+      });
+      all.sort((a, b) => (b.item.createdAt || 0) - (a.item.createdAt || 0));
+
+      const rows = all.length
+        ? all.map(({ book, item }) =>
+            '<div class="nn-item nn-item-all" data-bid="' + book.id + '" data-iid="' + item.id + '">' +
+            '  <div class="nn-item-meta">' +
+            '    <span class="nn-item-from" data-goto="' + book.id + '">' + App.escapeHtml(book.title) + '</span>' +
+            '    <span class="muted">' + fmtDate(item.createdAt) + '</span>' +
+            '  </div>' +
+            '  <div class="nn-item-text">' + App.escapeHtml(item.text) + '</div>' +
+            '  <div class="nn-item-ops">' +
+            '    <button class="nn-op" data-iedit="' + kind + '-' + book.id + '-' + item.id + '" type="button" aria-label="编辑">✏️</button>' +
+            '    <button class="nn-op" data-idel="' + kind + '-' + book.id + '-' + item.id + '" type="button" aria-label="删除">✕</button>' +
+            '  </div>' +
+            '</div>'
+          ).join('')
+        : '<div class="nn-shelf-empty"><div class="nn-shelf-emoji">' + emoji + '</div>' +
+          '<p class="muted">还没有' + label + '。点「📚 我的书」进入任意一本书，滑到最后一页添加。</p></div>';
+
+      bodyEl.innerHTML =
+        '<div class="nn-all">' +
+        '  <p class="muted nn-all-tip">共 ' + all.length + ' 条' + label + '（按时间倒序，点书名跳到该书）</p>' +
+        '  <div class="nn-section-list">' + rows + '</div>' +
+        '</div>';
+
+      // 跳到对应书
+      bodyEl.querySelectorAll('[data-goto]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const bid = el.dataset.goto;
+          view = 'detail';
+          currentBookId = bid;
+          paint();
+        });
+      });
+      // 编辑
+      bodyEl.querySelectorAll('[data-iedit]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const [k, bid, iid] = btn.dataset.iedit.split('-');
+          const b = getBook(bid);
+          if (!b) return;
+          const arr = k === 'a' ? b.analyses : b.quotes;
+          const it = arr.find((x) => x.id === iid);
+          if (it) openItemEditor(b, k, it, paint);
+        });
+      });
+      // 删除
+      bodyEl.querySelectorAll('[data-idel]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const [k, bid, iid] = btn.dataset.idel.split('-');
+          const b = getBook(bid);
+          if (!b) return;
+          const title = k === 'a' ? '分析' : '摘抄';
+          App.confirm('删除' + title, '确认删除这条' + title + '？', () => {
+            if (k === 'a') b.analyses = b.analyses.filter((x) => x.id !== iid);
+            else b.quotes = b.quotes.filter((x) => x.id !== iid);
+            save();
+            paint();
+            App.toast('已删除');
+          });
+        });
+      });
+    }
+    function fmtDate(t) {
+      if (!t) return '';
+      const d = new Date(t);
+      const pad = (n) => (n < 10 ? '0' + n : '' + n);
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
   }
 });

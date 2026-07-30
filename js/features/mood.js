@@ -1,9 +1,8 @@
 /**
  * 每日心情打卡：
- * - 今天的心情卡片：可记录 / 编辑 / 删除今日心情
- * - 横滑双页：
- *     第 1 页：今日心情 + 心情日历（每日表情在日期下方，可点开查看）
- *     第 2 页：总结（最近30天心情扇形图 + 每周小结 + 近期可视化）
+ * - 第 1 页：今日记录（编辑/删除今日心情）
+ * - 第 2 页：心情日历（每天的表情显示在日期下方，点击查看）
+ * - 第 3 页：总结（最近30天扇形图 + 每周小结 + 近期可视化）
  */
 App.registerFeature({
   id: 'mood',
@@ -44,16 +43,23 @@ App.registerFeature({
     let calY = now.getFullYear();
     let calM = now.getMonth();   // 0-based
 
-    // ---------- 渲染骨架（横滑双页） ----------
+    // ---------- 渲染骨架（横滑 3 页：记录 / 日历 / 总结） ----------
     container.innerHTML =
       '<div class="mo">' +
       '  <div class="mo-head"><h2>心情</h2><span class="muted">每天记录此刻的感受</span></div>' +
+      '  <div class="mo-tabs" id="mo-tabs">' +
+      '    <button class="mo-tab on" data-go="0" type="button">记录</button>' +
+      '    <button class="mo-tab" data-go="1" type="button">日历</button>' +
+      '    <button class="mo-tab" data-go="2" type="button">总结</button>' +
+      '  </div>' +
       '  <div class="mo-pages" id="mo-pages">' +
-      '    <div class="mo-page mo-page-tall" data-page="today">' +
-      '      <div class="mo-cal" id="mo-cal"></div>' +
+      '    <div class="mo-page mo-page-tall" data-page="0">' +
       '      <div class="mo-today-card" id="mo-today-card"></div>' +
       '    </div>' +
-      '    <div class="mo-page mo-page-tall" data-page="summary">' +
+      '    <div class="mo-page mo-page-tall" data-page="1">' +
+      '      <div class="mo-cal" id="mo-cal"></div>' +
+      '    </div>' +
+      '    <div class="mo-page mo-page-tall" data-page="2">' +
       '      <div class="mo-hist-title">心情分布 · 最近30天</div>' +
       '      <div class="mo-pie" id="mo-pie"></div>' +
       '      <div class="mo-hist-title">每周小结</div>' +
@@ -63,28 +69,32 @@ App.registerFeature({
       '    </div>' +
       '  </div>' +
       '  <div class="mo-pager" id="mo-pager">' +
-      '    <span class="mo-pager-dot on" data-go="today"></span>' +
-      '    <span class="mo-pager-dot" data-go="summary"></span>' +
+      '    <span class="mo-pager-dot on" data-go="0"></span>' +
+      '    <span class="mo-pager-dot" data-go="1"></span>' +
+      '    <span class="mo-pager-dot" data-go="2"></span>' +
       '  </div>' +
       '</div>';
 
     const pagesEl = container.querySelector('#mo-pages');
-    const pagerEl = container.querySelector('#mo-pager');
+    const tabsBtns = container.querySelectorAll('.mo-tab');
+    const pagerDots = container.querySelectorAll('.mo-pager-dot');
     const todayCardEl = container.querySelector('#mo-today-card');
     const calEl = container.querySelector('#mo-cal');
     const weeksEl = container.querySelector('#mo-weeks');
     const vizEl = container.querySelector('#mo-viz');
     const pieEl = container.querySelector('#mo-pie');
 
-    // 横滑：滚动同步 dot
+    function go(i) {
+      pagesEl.scrollTo({ left: i * pagesEl.clientWidth, behavior: 'smooth' });
+    }
+    // 横滑：滚动同步 tab+dot
     pagesEl.addEventListener('scroll', () => {
       const i = Math.round(pagesEl.scrollLeft / pagesEl.clientWidth);
-      pagerEl.querySelectorAll('.mo-pager-dot').forEach((d, idx) => d.classList.toggle('on', idx === i));
+      tabsBtns.forEach((b, idx) => b.classList.toggle('on', idx === i));
+      pagerDots.forEach((d, idx) => d.classList.toggle('on', idx === i));
     });
-    pagerEl.querySelectorAll('.mo-pager-dot').forEach((d) => d.addEventListener('click', () => {
-      const i = d.dataset.go === 'summary' ? 1 : 0;
-      pagesEl.scrollTo({ left: i * pagesEl.clientWidth, behavior: 'smooth' });
-    }));
+    tabsBtns.forEach((b) => b.addEventListener('click', () => go(+b.dataset.go)));
+    pagerDots.forEach((d) => d.addEventListener('click', () => go(+d.dataset.go)));
 
     // ---------- 今日心情卡片 ----------
     function renderTodayCard() {
@@ -132,7 +142,6 @@ App.registerFeature({
       function hideEditor() {
         editor.hidden = true;
         editBtn && (editBtn.hidden = false);
-        // 把 sel/note 重置到当前已保存状态
         sel = new Set(emojis);
         renderMoodButtons();
         const ne = container.querySelector('#mo-note');
@@ -176,7 +185,6 @@ App.registerFeature({
           '<span class="mo-mood-e">' + m.e + '</span><span class="mo-mood-n">' + m.n + '</span>' +
           '</button>';
       }).join('');
-      // 每次重新渲染后重新绑定 click 监听（之前的 innerHTML 替换会丢弃旧监听）
       moodsEl.onclick = (e) => {
         const b = e.target.closest('[data-e]');
         if (!b) return;
@@ -349,8 +357,7 @@ App.registerFeature({
         pieEl.innerHTML = '<p class="muted ci-empty">最近30天还没有记录。</p>';
         return;
       }
-      // SVG 扇形
-      let angle = -90;  // 从 12 点开始
+      let angle = -90;
       let paths = '';
       keys.forEach((k, i) => {
         const portion = counts[k] / total;

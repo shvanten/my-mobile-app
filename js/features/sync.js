@@ -246,6 +246,20 @@ App.registerFeature({
       '  <div class="sy-body">' +
       '    <div class="sy-status" id="sy-status"></div>' +
 
+      '    <details class="sy-card sy-card-guide" id="sy-guide">' +
+      '      <summary class="sy-card-title">📘 三步上手（点开看教程）</summary>' +
+      '      <div class="sy-guide-body">' +
+      '        <p class="sy-guide-intro">方案 A 用 <b>GitHub Gist</b> 当云端。一个 Private Gist 装下所有数据，免费、私密。</p>' +
+      '        <ol class="sy-guide-steps">' +
+      '          <li><b>生成 Token</b>：打开 <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> → <b>Generate new token (classic)</b> → <b>只勾 gist 权限</b> → 生成（形如 <code>ghp_xxxx…</code>）</li>' +
+      '          <li><b>填写 + 测试</b>：把 Token 粘到下方输入框 → 点「测试 Token」→ 显示 <code>Token 有效（你的用户名）</code> 就成功</li>' +
+      '          <li><b>点立即推送</b>：自动创建一个 Private Gist，数据就存进去了</li>' +
+      '        </ol>' +
+      '        <p class="sy-guide-next">另一台设备上同样配置同一个 Token，进入「同步」页会自动拉取（或点「立即拉取」），刷新页面就能看到数据。</p>' +
+      '        <p class="sy-guide-tip">💡 数据变更后会自动推送（5 秒防抖），你在手机记一笔，回到电脑刷新一下就有了。</p>' +
+      '      </div>' +
+      '    </details>' +
+
       '    <div class="sy-card">' +
       '      <div class="sy-card-title">① 配置 GitHub Token</div>' +
       '      <div class="sy-hint">在 GitHub → Settings → Developer settings → Personal access tokens 生成，<b>只需勾选 gist 权限</b>，无需其他勾选。</div>' +
