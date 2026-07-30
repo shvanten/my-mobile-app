@@ -84,7 +84,6 @@ App.registerFeature({
     let data = load();
 
     const uid = (p) => (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const BOOK_EMOJIS = ['📕', '📖', '📚', '📓', '📔', '📘', '📗', '📙'];
     function getBook(id) { return data.books.find((b) => b.id === id); }
 
     // ---------- 状态 ----------
@@ -299,7 +298,6 @@ App.registerFeature({
       const isNew = !existing;
       const wrap = document.createElement('div');
       wrap.className = 'nn-mask';
-      let curEmoji = existing ? existing.emoji : BOOK_EMOJIS[0];
       let curType = existing ? existing.type : 'short';
       wrap.innerHTML =
         '<div class="nn-sheet">' +
@@ -311,12 +309,6 @@ App.registerFeature({
         '      <button class="nb-type-btn' + (curType === 'short' ? ' on' : '') + '" data-t="short" type="button">📖 短篇</button>' +
         '      <button class="nb-type-btn' + (curType === 'long' ? ' on' : '') + '" data-t="long" type="button">📚 长篇</button>' +
         '    </div>' +
-        '  </div>' +
-        '  <div>' +
-        '    <p class="muted nb-h">封面图标</p>' +
-        '    <div class="nb-emojis">' +
-              BOOK_EMOJIS.map((ec) => '<button class="nb-emoji' + (ec === curEmoji ? ' on' : '') + '" data-e="' + ec + '" type="button">' + ec + '</button>').join('') +
-        '  </div>' +
         '  </div>' +
         '  <div class="nn-e-btns">' +
         '    <button class="btn ghost" data-close type="button">取消</button>' +
@@ -330,11 +322,6 @@ App.registerFeature({
         curType = b.dataset.t;
         wrap.querySelectorAll('[data-t]').forEach((x) => x.classList.toggle('on', x === b));
       });
-      wrap.querySelector('.nb-emojis').addEventListener('click', (e) => {
-        const b = e.target.closest('[data-e]'); if (!b) return;
-        curEmoji = b.dataset.e;
-        wrap.querySelectorAll('[data-e]').forEach((x) => x.classList.toggle('on', x === b));
-      });
       function close() { wrap.remove(); }
       wrap.addEventListener('click', (e) => { if (e.target === wrap || e.target.matches('[data-close]')) close(); });
       wrap.querySelector('#nb-ok').addEventListener('click', () => {
@@ -342,13 +329,13 @@ App.registerFeature({
         if (!t) { App.toast('请输入书名'); return; }
         if (isNew) {
           data.books.push({
-            id: uid('b'), title: t, type: curType, emoji: curEmoji,
+            id: uid('b'), title: t, type: curType, emoji: '📕',
             tagline: '', hook: '', chars: '',
             analyses: [], quotes: [],
             createdAt: Date.now(),
           });
         } else {
-          existing.title = t; existing.type = curType; existing.emoji = curEmoji;
+          existing.title = t; existing.type = curType;
         }
         save(); close();
         paint();

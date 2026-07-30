@@ -118,7 +118,8 @@ App.registerFeature({
         '  </div>' +
         '</div>';
       renderMoodButtons();
-      noteEl.value = note;
+      const liveNoteEl = container.querySelector('#mo-note');
+      if (liveNoteEl) liveNoteEl.value = note;
       const editor = container.querySelector('#mo-today-editor');
       const editBtn = container.querySelector('#mo-edit-today');
       const delBtn = container.querySelector('#mo-del-today');
@@ -135,14 +136,16 @@ App.registerFeature({
         // 把 sel/note 重置到当前已保存状态
         sel = new Set(emojis);
         renderMoodButtons();
-        noteEl.value = note;
+        const ne = container.querySelector('#mo-note');
+        if (ne) ne.value = note;
       }
 
       if (editBtn) editBtn.addEventListener('click', showEditor);
       if (cancelBtn) cancelBtn.addEventListener('click', hideEditor);
       if (saveBtn) saveBtn.addEventListener('click', () => {
+        const ne2 = container.querySelector('#mo-note');
         const list = Array.from(sel);
-        const nn = noteEl.value.trim();
+        const nn = ne2 ? ne2.value.trim() : '';
         if (!list.length && !nn) { App.toast('选一个心情，或写点什么吧'); return; }
         data[t] = { list: list, note: nn };
         save();
@@ -163,11 +166,10 @@ App.registerFeature({
       });
     }
 
-    const moodsEl = container.querySelector('#mo-moods');
-    const noteEl = container.querySelector('#mo-note');
-
-    // ---------- 今天编辑器 ----------
+    // moodsEl 改为函数内查询（renderTodayCard 首次执行时才会创建 #mo-moods）
     function renderMoodButtons() {
+      const moodsEl = container.querySelector('#mo-moods');
+      if (!moodsEl) return;
       moodsEl.innerHTML = MOODS.map((m) => {
         const on = sel.has(m.e) ? ' on' : '';
         return '<button class="mo-mood' + on + '" type="button" data-e="' + m.e + '" ' +
@@ -175,16 +177,16 @@ App.registerFeature({
           '<span class="mo-mood-e">' + m.e + '</span><span class="mo-mood-n">' + m.n + '</span>' +
           '</button>';
       }).join('');
+      // 每次重新渲染后重新绑定 click 监听（之前的 innerHTML 替换会丢弃旧监听）
+      moodsEl.onclick = (e) => {
+        const b = e.target.closest('[data-e]');
+        if (!b) return;
+        const e2 = b.dataset.e;
+        if (sel.has(e2)) sel.delete(e2); else sel.add(e2);
+        b.classList.toggle('on');
+        b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false');
+      };
     }
-
-    moodsEl.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-e]');
-      if (!b) return;
-      const e2 = b.dataset.e;
-      if (sel.has(e2)) sel.delete(e2); else sel.add(e2);
-      b.classList.toggle('on');
-      b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false');
-    });
 
     // ---------- 心情日历 ----------
     function renderCalendar() {
