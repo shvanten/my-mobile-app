@@ -174,9 +174,45 @@ App.registerFeature({
       '    <div class="ci-sheet-backdrop"></div>' +
       '    <div class="ci-sheet-box">' +
       '      <div class="ci-sheet-title" id="ci-sheet-title"></div>' +
+      '      <button class="ci-sheet-act" data-act="edit-labels" type="button">✏️ 编辑每份名称</button>' +
+      '      <button class="ci-sheet-act" data-act="makeup" type="button">🩹 补签</button>' +
       '      <button class="ci-sheet-act" data-act="archive" type="button">📦 收官</button>' +
       '      <button class="ci-sheet-act danger" data-act="delete" type="button">🗑 删除</button>' +
       '      <button class="ci-sheet-act cancel" data-act="cancel" type="button">取消</button>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div class="ci-modal" id="ci-edit-modal" hidden>' +
+      '    <div class="ci-modal-box">' +
+      '      <h3 id="ci-edit-title">编辑每份名称</h3>' +
+      '      <p class="muted ci-edit-sub" id="ci-edit-sub"></p>' +
+      '      <div class="ci-field">' +
+      '        <span>名称</span>' +
+      '        <input id="ci-edit-name" type="text" maxlength="12" placeholder="习惯名" autocomplete="off" />' +
+      '      </div>' +
+      '      <div class="ci-field"><span>每天分几份</span>' +
+      '        <input id="ci-edit-parts" type="number" min="1" max="20" />' +
+      '      </div>' +
+      '      <div class="ci-field"><span>各份任务内容（可留空，默认「第 N 份」）</span>' +
+      '        <div id="ci-edit-labels" class="ci-labels"></div>' +
+      '      </div>' +
+      '      <div class="ci-modal-actions">' +
+      '        <button class="btn ghost" id="ci-edit-cancel" type="button">取消</button>' +
+      '        <button class="btn" id="ci-edit-save" type="button">保存</button>' +
+      '      </div>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div class="ci-modal" id="ci-makeup-modal" hidden>' +
+      '    <div class="ci-modal-box">' +
+      '      <h3>补签</h3>' +
+      '      <p class="muted ci-edit-sub">为过去的某一天补打卡（按当时份数全部完成）。</p>' +
+      '      <div class="ci-field"><span>选择日期</span>' +
+      '        <input id="ci-makeup-date" type="date" />' +
+      '      </div>' +
+      '      <p class="muted ci-makeup-hint" id="ci-makeup-hint"></p>' +
+      '      <div class="ci-modal-actions">' +
+      '        <button class="btn ghost" id="ci-makeup-cancel" type="button">取消</button>' +
+      '        <button class="btn" id="ci-makeup-save" type="button">确认补签</button>' +
+      '      </div>' +
       '    </div>' +
       '  </div>' +
       '</div>';
@@ -190,6 +226,8 @@ App.registerFeature({
     const mainView = container.querySelector('#ci-main');
     const archiveListView = container.querySelector('#ci-archive-list');
     const archiveDetailView = container.querySelector('#ci-archive-detail');
+    const editModal = container.querySelector('#ci-edit-modal');
+    const makeupModal = container.querySelector('#ci-makeup-modal');
 
     // ---------- 顶部头栏（按 viewMode 不同显示不同按钮） ----------
     function renderHead() {
@@ -801,7 +839,13 @@ App.registerFeature({
       const a = act.dataset.act;
       if (a === 'cancel') { closeEditSheet(); return; }
       if (!sheetTargetId) { closeEditSheet(); return; }
-      if (a === 'archive') {
+      if (a === 'edit-labels') {
+        openEditLabelsModal(sheetTargetId);
+        closeEditSheet();
+      } else if (a === 'makeup') {
+        openMakeupModal(sheetTargetId);
+        closeEditSheet();
+      } else if (a === 'archive') {
         if (confirm('确定收官「' + (habits.find((x) => x.id === sheetTargetId) || {}).name + '」？\n收官后可在「已收官」中查看历史记录。')) {
           archiveHabit(sheetTargetId);
         }
@@ -854,6 +898,138 @@ App.registerFeature({
       App.toast('已删除：' + h.name);
       refresh();
     }
+
+    // ---------- 编辑每份名称 ----------
+    let editTargetId = null;
+    function renderEditLabels(parts, labels) {
+      const wrap = editModal.querySelector('#ci-edit-labels');
+      wrap.innerHTML = '';
+      for (let i = 0; i < parts; i++) {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.maxLength = 12;
+        inp.placeholder = '第' + (i + 1) + '份';
+        inp.className = 'ci-label-input';
+        inp.value = (labels && labels[i]) ? labels[i] : '';
+        inp.dataset.i = i;
+        wrap.appendChild(inp);
+      }
+    }
+    function openEditLabelsModal(id) {
+      const h = habits.find((x) => x.id === id);
+      if (!h) return;
+      editTargetId = id;
+      editModal.querySelector('#ci-edit-title').textContent = '编辑「' + (h.icon || '') + ' ' + h.name + '」';
+      editModal.querySelector('#ci-edit-sub').textContent = '可修改名称和每一份的任务内容；份数变化会按现有对应关系保留。';
+      editModal.querySelector('#ci-edit-name').value = h.name || '';
+      editModal.querySelector('#ci-edit-parts').value = h.parts;
+      renderEditLabels(h.parts, h.labels || []);
+      editModal.hidden = false;
+    }
+    function closeEditModal() { editModal.hidden = true; editTargetId = null; }
+    editModal.querySelector('#ci-edit-parts').addEventListener('input', () => {
+      // 份数变化时只重渲输入框（已写内容按 i 保留，越界部分丢弃）
+      const inputs = Array.from(editModal.querySelectorAll('#ci-edit-labels .ci-label-input'));
+      const keep = inputs.map((i) => i.value);
+      let n = parseInt(editModal.querySelector('#ci-edit-parts').value, 10);
+      if (!n || n < 1) n = 1; if (n > 20) n = 20;
+      renderEditLabels(n, keep);
+    });
+    editModal.querySelector('#ci-edit-cancel').addEventListener('click', closeEditModal);
+    editModal.addEventListener('click', (e) => { if (e.target === editModal) closeEditModal(); });
+    editModal.querySelector('#ci-edit-save').addEventListener('click', () => {
+      const h = habits.find((x) => x.id === editTargetId);
+      if (!h) { closeEditModal(); return; }
+      const name = editModal.querySelector('#ci-edit-name').value.trim() || h.name;
+      const newParts = parseInt(editModal.querySelector('#ci-edit-parts').value, 10) || h.parts;
+      const newLabels = [];
+      const inputs = editModal.querySelectorAll('#ci-edit-labels .ci-label-input');
+      for (let i = 0; i < newParts; i++) {
+        newLabels.push((inputs[i] && inputs[i].value.trim()) || '');
+      }
+      // 1) 名称
+      h.name = name;
+      // 2) 份数变化：迁移所有 records（按 i 保留现有 parts[i]；新增的为 false；减少则丢弃超出部分）
+      if (newParts !== h.parts) {
+        const rec = records[h.id] || {};
+        Object.keys(rec).forEach((ds) => {
+          const e = rec[ds];
+          if (!e) return;
+          const oldParts = (e.parts && e.parts.length) || h.parts;
+          const fixed = new Array(newParts).fill(false);
+          for (let i = 0; i < Math.min(newParts, oldParts); i++) fixed[i] = !!e.parts[i];
+          e.parts = fixed;
+          // done 仅在份数变化后仍能完全完成时保留
+          if (e.done && !fixed.every(Boolean)) e.done = false;
+        });
+        records[h.id] = rec;
+        h.parts = newParts;
+        saveRecords();
+      }
+      // 3) 标签
+      h.labels = newLabels;
+      saveHabits();
+      closeEditModal();
+      App.toast('已保存「' + h.name + '」');
+      refresh();
+    });
+
+    // ---------- 补签 ----------
+    let makeupTargetId = null;
+    function openMakeupModal(id) {
+      const h = habits.find((x) => x.id === id);
+      if (!h) return;
+      makeupTargetId = id;
+      // 默认日期 = 昨天
+      const y = new Date(); y.setDate(y.getDate() - 1);
+      const def = y.getFullYear() + '-' + pad(y.getMonth() + 1) + '-' + pad(y.getDate());
+      const dateInput = makeupModal.querySelector('#ci-makeup-date');
+      dateInput.value = def;
+      // 限制可选范围：仅过去日期（昨天起往前）到记录起点（用习惯创建时间）
+      const today = todayStr();
+      const min = (h.createdAt && h.createdAt <= today) ? h.createdAt : (function () {
+        // 最早有记录的日期
+        const rec = records[h.id] || {};
+        const keys = Object.keys(rec);
+        if (keys.length) return keys.sort()[0];
+        return today;
+      })();
+      dateInput.min = min;
+      dateInput.max = today;
+      // 上限取 min(创建时间, 今天)
+      const hint = makeupModal.querySelector('#ci-makeup-hint');
+      hint.textContent = '将把所选日期的 ' + h.parts + ' 份全部标记为完成（仅过去日期可补签）。';
+      makeupModal.hidden = false;
+    }
+    function closeMakeupModal() { makeupModal.hidden = true; makeupTargetId = null; }
+    makeupModal.querySelector('#ci-makeup-cancel').addEventListener('click', closeMakeupModal);
+    makeupModal.addEventListener('click', (e) => { if (e.target === makeupModal) closeMakeupModal(); });
+    makeupModal.querySelector('#ci-makeup-save').addEventListener('click', () => {
+      const h = habits.find((x) => x.id === makeupTargetId);
+      if (!h) { closeMakeupModal(); return; }
+      const ds = makeupModal.querySelector('#ci-makeup-date').value;
+      if (!ds) { App.toast('请选择日期'); return; }
+      const t = todayStr();
+      if (ds > t) { App.toast('只能为过去日期补签'); return; }
+      const rec = records[h.id] || (records[h.id] = {});
+      const arr = new Array(h.parts).fill(false);
+      for (let i = 0; i < h.parts; i++) arr[i] = true;   // 全部完成
+      rec[ds] = { parts: arr, done: true };
+      saveRecords();
+      closeMakeupModal();
+      App.toast('已为 ' + ds + ' 补签「' + h.name + '」');
+      // 刷新：日历该日加深 + 切到该日展示
+      selDate = ds;
+      paintCalendar();
+      paintDetail();
+      // 滚到补签日所在行（按 calEl 当前可视区定位）
+      requestAnimationFrame(() => {
+        const anchor = calEl.querySelector('.ci-day[data-date="' + ds + '"]');
+        if (anchor) {
+          anchor.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      });
+    });
 
     // ---------- 首次渲染 ----------
     refresh();

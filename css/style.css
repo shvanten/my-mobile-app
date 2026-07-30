@@ -534,14 +534,29 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   border-radius: var(--radius);
   background: var(--card);
   box-shadow: var(--shadow-sm);
+  /* 移动端本就没有滚动条；桌面端用细色滚动条（4px），并彻底隐藏两端的三角按钮，
+     避免在窄滚动条上出现的"小三角位置不对"错位。 */
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--accent-deep) 35%, transparent) transparent;
 }
-.ci-cal::-webkit-scrollbar { width: 4px; }
+.ci-cal::-webkit-scrollbar { width: 4px; height: 0; }
 .ci-cal::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent-deep) 35%, transparent); border-radius: 4px; }
-/* 隐藏 webkit 滚动条两端的「上下滚动按钮」—— 4px 太窄装不下时会出现三角形错位 */
-.ci-cal::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-.ci-cal::-webkit-scrollbar-track { background: transparent; }
+/* webkit 滚动条两端的「上下滚动按钮」—— 4px 太窄装不下时会出现三角形错位；这里直接置 0 彻底隐藏 */
+.ci-cal::-webkit-scrollbar-button,
+.ci-cal::-webkit-scrollbar-button:single-button,
+.ci-cal::-webkit-scrollbar-button:double-button,
+.ci-cal::-webkit-scrollbar-button:vertical:start:increment,
+.ci-cal::-webkit-scrollbar-button:vertical:end:increment,
+.ci-cal::-webkit-scrollbar-button:horizontal:start:increment,
+.ci-cal::-webkit-scrollbar-button:horizontal:end:increment {
+  display: none !important;
+  width: 0 !important; height: 0 !important;
+  background: transparent !important;
+  -webkit-appearance: none !important;
+}
+.ci-cal::-webkit-scrollbar-track,
+.ci-cal::-webkit-scrollbar-track-piece { background: transparent; display: none; }
+.ci-cal::-webkit-scrollbar-corner { background: transparent; display: none; }
 
 /* 顶部星期表头：吸顶，滚动时固定在小窗顶部（用负边距铺满宽度，自带顶部留白） */
 .ci-cal-head {
@@ -643,7 +658,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: 0;
+  padding: 18px 4px 6px;   /* 与上方日历小窗之间留出明显间距，不再紧贴 */
 }
 .ci-locked { font-size: 13px; color: var(--muted); margin: 0; text-align: center; letter-spacing: .5px; }
 
