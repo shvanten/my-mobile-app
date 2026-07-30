@@ -433,7 +433,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 }
 .ci-locked { font-size: 13px; color: var(--muted); margin: 0; text-align: center; letter-spacing: .5px; }
 
-/* 小任务容器：默认横向居中条，放小任务方框 */
+/* 小任务容器：默认半透明悬浮卡片（不是实色块，是悬浮在背景上的"玻璃片"） */
 .ci-parts {
   display: flex;
   justify-content: space-around;
@@ -442,10 +442,20 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   gap: 8px;
   padding: 16px 14px;
   min-height: 92px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   border-radius: var(--radius);
+  box-shadow:
+    0 12px 32px rgba(39, 64, 39, 0.10),
+    0 2px 6px rgba(39, 64, 39, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
   transition: background .35s ease, border-color .35s ease, box-shadow .35s ease;
+}
+@supports not (backdrop-filter: blur(1px)) {
+  /* 不支持 backdrop-filter 的浏览器回退到更不透明的底色，避免读不清 */
+  .ci-parts { background: color-mix(in srgb, var(--surface) 85%, transparent); }
 }
 /* 全部完成后：从小任务条 → 圆角正方形 的 morph 动画。
    最终停在 84px 圆角正方形（不变成圆形）；pending 浅色，confirmed 切换深色。 */
@@ -473,7 +483,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 }
 .ci-parts.all-done:active { transform: scale(.96); }
 /* morph 关键帧：
-   - 0% 大框 + 小任务排列（与默认态一致）
+   - 0% 大框 + 小任务排列（与默认态一致：半透明悬浮卡）
    - 35% 大框收成竖长方形（高度 ≈ 按钮直径）；小任务此刻已淡出
    - 70% 已是 84×84 的圆角正方形（accent-soft 底）
    - 100% 停在圆角正方形（border-radius 18px），不再变成圆形 */
@@ -483,9 +493,11 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
     height: 92px;
     padding: 16px 14px;
     border-radius: var(--radius);
-    background: var(--surface);
-    border-color: var(--border);
-    box-shadow: none;
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
+    border-color: color-mix(in srgb, var(--border) 55%, transparent);
+    box-shadow:
+      0 12px 32px rgba(39, 64, 39, 0.10),
+      0 2px 6px rgba(39, 64, 39, 0.05);
     display: flex;
     justify-content: space-around;
     align-items: center;
@@ -495,9 +507,10 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
     height: 84px;
     padding: 8px;
     border-radius: var(--radius);
-    background: var(--surface);
-    border-color: var(--border);
-    box-shadow: none;
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
+    border-color: color-mix(in srgb, var(--border) 55%, transparent);
+    box-shadow:
+      0 8px 18px rgba(39, 64, 39, 0.08);
     display: flex;
     justify-content: center;
     align-items: center;
