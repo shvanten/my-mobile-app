@@ -1,6 +1,6 @@
 /**
  * 小说拆文：
- * - 自己创建「书」(长篇 / 短篇)，选择封面图标
+ * - 自己创建「书」(长篇 / 短篇)
  * - 每个书里可写：导语、核心梗、人设
  * - 每个书里有两个列表：分析、摘抄（每条可编辑/删除）
  * - 书架视图：书本形象卡片，点击有翻书动画进入详情
@@ -133,7 +133,6 @@ App.registerFeature({
                     '  <div class="nn-book-cover">' +
                     '    <div class="nn-book-spine"></div>' +
                     '    <div class="nn-book-front">' +
-                    '      <div class="nn-book-emoji">' + App.escapeHtml(b.emoji || '📕') + '</div>' +
                     '      <div class="nn-book-title">' + App.escapeHtml(b.title) + '</div>' +
                     '      <div class="nn-book-type nn-book-type-' + tint + '">' + (tint === 'long' ? '📚 长篇' : '📖 短篇') + '</div>' +
                     '    </div>' +
@@ -184,7 +183,6 @@ App.registerFeature({
         '    <button class="btn ghost sm nn-back-btn" id="nn-back" type="button">← 书架</button>' +
         '  </div>' +
         '  <div class="nn-page-head">' +
-        '    <div class="nn-page-emoji">' + App.escapeHtml(b.emoji || '📕') + '</div>' +
         '    <div class="nn-page-titles">' +
         '      <h2>' + App.escapeHtml(b.title) +
                 '<span class="nn-book-type nn-book-type-' + tint + '">' + (tint === 'long' ? '📚 长篇' : '📖 短篇') + '</span></h2>' +
