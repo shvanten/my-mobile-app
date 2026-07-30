@@ -205,10 +205,8 @@ App.registerFeature({
       if (!h) { detailEl.innerHTML = ''; return; }
       const ds = selDate;
       const arr = getDayArr(h, ds);
-      const done = arr.filter(Boolean).length;
       const isToday = ds === todayStr();
       const locked = !isToday;  // 过去和未来都锁定，只有今天可编辑
-      const full = done === h.parts;
       let html = '';
 
       if (locked) {
@@ -217,12 +215,7 @@ App.registerFeature({
           (isPast(ds) ? '悟已往之不谏，知来者之可追。' : '尚未到来。') +
           '</p>';
       } else {
-        // 只有今天：显示日期/名称/进度 + 可点击的小任务方框
-        html += '<div class="ci-detail-head">' +
-          '<span class="ci-detail-date">' + ds + '</span>' +
-          '<span class="ci-detail-habit">' + App.escapeHtml(h.icon) + ' ' + App.escapeHtml(h.name) + '</span>' +
-          '<span class="ci-detail-prog">' + done + ' / ' + h.parts + '</span>' +
-          '</div>';
+        // 只有今天：直接显示可点击的小任务方框（不再显示日期/名称/进度，顶部 habit 列表已有）
         html += '<div class="ci-parts">';
         const labels = (h.labels && h.labels.length === h.parts)
           ? h.labels
