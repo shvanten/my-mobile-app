@@ -8,7 +8,6 @@
  *   { "v":1, "ts":<ms>, "stores": {
  *       "mood":       { "ts":.., "data": <localStorage mood.v1> },
  *       "ledger":     { "ts":.., "data": <localStorage ledger.v1> },
- *       "novelnotes": { "ts":.., "data": <localStorage novelnotes.v1> },
  *       "checkin":    { "ts":.., "habits":..., "records":..., "archived":... }
  *     } }
  *
@@ -51,7 +50,6 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
       stores: {
         mood:       { ts: Date.now(), data: read('mood.v1') },
         ledger:     { ts: Date.now(), data: read('ledger.v1') },
-        novelnotes: { ts: Date.now(), data: read('novelnotes.v1') },
         sticky:     { ts: Date.now(), data: read('sticky.v1') },
         checkin: {
           ts: Date.now(),
@@ -82,7 +80,6 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
       const ci = typeof cloud.init === 'number' ? cloud.init : 0;
       return { init: Math.max(li, ci), records: unionById(local.records, cloud.records) };
     }
-    if (key === 'novelnotes') return { books: unionById(local.books, cloud.books) };
     if (key === 'mood') {
       const out = Object.assign({}, local);
       Object.keys(cloud).forEach((d) => {
@@ -101,7 +98,7 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
     if (!remote || !remote.stores) return 0;
     let n = 0;
     const s = remote.stores;
-    [['mood', 'mood.v1'], ['ledger', 'ledger.v1'], ['novelnotes', 'novelnotes.v1'], ['sticky', 'sticky.v1']].forEach(([k, key]) => {
+    [['mood', 'mood.v1'], ['ledger', 'ledger.v1'], ['sticky', 'sticky.v1']].forEach(([k, key]) => {
       const cloudData = (s[k] && s[k].data != null) ? s[k].data : null;
       const merged = mergeModule(k, read(key), cloudData);
       if (merged != null) { write(key, merged); n++; }
@@ -122,7 +119,7 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
   // 推送时：以本地为基底，把云端独有的数据并进来（相加合并，云端不会覆盖掉本地）
   function mergeStores(base, local) {
     const out = JSON.parse(JSON.stringify(local));
-    ['mood', 'ledger', 'novelnotes', 'sticky'].forEach((k) => {
+    ['mood', 'ledger', 'sticky'].forEach((k) => {
       const cloudData = (base[k] && base[k].data != null) ? base[k].data : null;
       const localData = (out[k] && out[k].data != null) ? out[k].data : null;
       out[k] = { ts: Date.now(), data: mergeModule(k, localData, cloudData) };
