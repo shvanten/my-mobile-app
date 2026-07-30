@@ -24,9 +24,15 @@ App.registerFeature({
       try { return JSON.parse(localStorage.getItem(REC_KEY)) || {}; } catch (e) { return {}; }
     }
     function saveRecords() { localStorage.setItem(REC_KEY, JSON.stringify(records)); }
+    const ARCHIVE_KEY = 'checkin.archived.v1';
+    function loadArchived() {
+      try { return JSON.parse(localStorage.getItem(ARCHIVE_KEY)) || []; } catch (e) { return []; }
+    }
+    function saveArchived() { localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived)); }
 
     let habits = loadHabits();
     let records = loadRecords();
+    let archived = loadArchived();
 
     // ---------- 工具 ----------
     const pad = (n) => (n < 10 ? '0' + n : '' + n);
@@ -125,19 +131,27 @@ App.registerFeature({
     let viewStartY = now.getFullYear();
     let viewStartM = now.getMonth() - VIEW_BACK;
     let selDate = todayStr();
+    // 视图模式：'main' 主界面（活动习惯）/ 'archive-list' 已收官列表 / 'archive-detail' 已收官详情
+    let viewMode = 'main';
+    let archiveDetailId = null;
+    // 编辑菜单里当前操作的目标习惯 id
+    let sheetTargetId = null;
 
     function selHabit() { return habits.find((h) => h.id === selHabitId) || null; }
 
     // ---------- 渲染骨架 ----------
     container.innerHTML =
       '<div class="ci">' +
-      '  <div class="ci-head">' +
-      '    <h2>打卡</h2>' +
-      '    <button class="btn ci-add" type="button">＋ 新建打卡</button>' +
+      '  <div class="ci-head" id="ci-head"></div>' +
+      '  <div class="ci-body" id="ci-body">' +
+      '    <section class="ci-view ci-main" id="ci-main">' +
+      '      <div class="ci-habits" id="ci-habits"></div>' +
+      '      <div class="ci-cal" id="ci-cal"></div>' +
+      '      <div class="ci-detail" id="ci-detail"></div>' +
+      '    </section>' +
+      '    <section class="ci-view" id="ci-archive-list" hidden></section>' +
+      '    <section class="ci-view" id="ci-archive-detail" hidden></section>' +
       '  </div>' +
-      '  <div class="ci-habits" id="ci-habits"></div>' +
-      '  <div class="ci-cal" id="ci-cal"></div>' +
-      '  <div class="ci-detail" id="ci-detail"></div>' +
       '  <div class="ci-modal" id="ci-modal" hidden>' +
       '    <div class="ci-modal-box">' +
       '      <h3>新建打卡</h3>' +
@@ -156,12 +170,63 @@ App.registerFeature({
       '      </div>' +
       '    </div>' +
       '  </div>' +
+      '  <div class="ci-sheet" id="ci-sheet" hidden>' +
+      '    <div class="ci-sheet-backdrop"></div>' +
+      '    <div class="ci-sheet-box">' +
+      '      <div class="ci-sheet-title" id="ci-sheet-title"></div>' +
+      '      <button class="ci-sheet-act" data-act="archive" type="button">📦 收官</button>' +
+      '      <button class="ci-sheet-act danger" data-act="delete" type="button">🗑 删除</button>' +
+      '      <button class="ci-sheet-act cancel" data-act="cancel" type="button">取消</button>' +
+      '    </div>' +
+      '  </div>' +
       '</div>';
 
     const habitsEl = container.querySelector('#ci-habits');
     const calEl = container.querySelector('#ci-cal');
     const detailEl = container.querySelector('#ci-detail');
     const modal = container.querySelector('#ci-modal');
+    const sheet = container.querySelector('#ci-sheet');
+    const headEl = container.querySelector('#ci-head');
+    const mainView = container.querySelector('#ci-main');
+    const archiveListView = container.querySelector('#ci-archive-list');
+    const archiveDetailView = container.querySelector('#ci-archive-detail');
+
+    // ---------- 顶部头栏（按 viewMode 不同显示不同按钮） ----------
+    function renderHead() {
+      if (viewMode === 'main') {
+        headEl.innerHTML =
+          '<h2>打卡</h2>' +
+          '<div class="ci-head-actions">' +
+          '  <button class="btn ghost ci-archive-btn" type="button" data-act="archive-list">📦 已收官</button>' +
+          '  <button class="btn ci-add" type="button">＋ 新建打卡</button>' +
+          '</div>';
+        headEl.querySelector('.ci-add').addEventListener('click', openModal);
+        headEl.querySelector('[data-act="archive-list"]').addEventListener('click', () => {
+          viewMode = 'archive-list';
+          refresh();
+        });
+      } else if (viewMode === 'archive-list') {
+        headEl.innerHTML =
+          '<button class="icon-btn ci-back" type="button" data-act="back" title="返回">←</button>' +
+          '<h2>已收官</h2>' +
+          '<span class="ci-head-spacer"></span>';
+        headEl.querySelector('[data-act="back"]').addEventListener('click', () => {
+          viewMode = 'main';
+          refresh();
+        });
+      } else if (viewMode === 'archive-detail') {
+        const h = archived.find((x) => x.id === archiveDetailId);
+        headEl.innerHTML =
+          '<button class="icon-btn ci-back" type="button" data-act="back" title="返回">←</button>' +
+          '<h2>' + App.escapeHtml(h ? h.icon + ' ' + h.name : '已收官') + '</h2>' +
+          '<span class="ci-head-spacer"></span>';
+        headEl.querySelector('[data-act="back"]').addEventListener('click', () => {
+          viewMode = 'archive-list';
+          archiveDetailId = null;
+          refresh();
+        });
+      }
+    }
 
     // ---------- 习惯列表 ----------
     function paintHabits() {
@@ -172,12 +237,175 @@ App.registerFeature({
       habitsEl.innerHTML = habits.map((h) => {
         const done = todayDoneCount(h);
         const active = h.id === selHabitId ? ' active' : '';
-        return '<button class="ci-habit' + active + '" type="button" data-id="' + h.id + '">' +
-          '<span class="ci-habit-ic">' + App.escapeHtml(h.icon) + '</span>' +
-          '<span class="ci-habit-name">' + App.escapeHtml(h.name) + '</span>' +
-          '<span class="ci-habit-prog">' + done + '/' + h.parts + '</span>' +
+        return '<div class="ci-habit' + active + '" data-id="' + h.id + '">' +
+          '<button class="ci-habit-main" type="button" data-id="' + h.id + '">' +
+          '  <span class="ci-habit-ic">' + App.escapeHtml(h.icon) + '</span>' +
+          '  <span class="ci-habit-name">' + App.escapeHtml(h.name) + '</span>' +
+          '  <span class="ci-habit-prog">' + done + '/' + h.parts + '</span>' +
+          '</button>' +
+          '<button class="ci-habit-menu" type="button" data-menu="' + h.id + '" title="编辑" aria-label="编辑 ' + App.escapeHtml(h.name) + '">⋯</button>' +
+          '</div>';
+      }).join('');
+    }
+
+    // ---------- 已收官列表 ----------
+    function paintArchiveList() {
+      if (!archived.length) {
+        archiveListView.innerHTML = '<p class="muted ci-empty">还没有已收官的习惯。</p>';
+        return;
+      }
+      // 按收官时间倒序
+      const sorted = archived.slice().sort((a, b) => (b.archivedAt || '').localeCompare(a.archivedAt || ''));
+      archiveListView.innerHTML = sorted.map((h) => {
+        const days = (h.successDates || []).length;
+        return '<button class="ci-archive-item" type="button" data-id="' + h.id + '">' +
+          '<span class="ci-archive-ic">' + App.escapeHtml(h.icon) + '</span>' +
+          '<span class="ci-archive-meta">' +
+          '  <span class="ci-archive-name">' + App.escapeHtml(h.name) + '</span>' +
+          '  <span class="ci-archive-sub">收官于 ' + App.escapeHtml(h.archivedAt || '—') + ' · 打卡 ' + days + ' 天</span>' +
+          '</span>' +
+          '<span class="ci-archive-arrow">›</span>' +
           '</button>';
       }).join('');
+    }
+
+    // ---------- 已收官详情 ----------
+    function paintArchiveDetail(id) {
+      const h = archived.find((x) => x.id === id);
+      if (!h) { archiveDetailView.innerHTML = '<p class="muted">未找到此习惯。</p>'; return; }
+      const successList = (h.successDates || []).slice().sort();
+      const successCount = successList.length;
+      // 顶部信息卡
+      let html = '<div class="ci-archive-info">' +
+        '<div class="ci-archive-info-row"><span class="muted">创建时间</span><span>' + App.escapeHtml(h.createdAt || '—') + '</span></div>' +
+        '<div class="ci-archive-info-row"><span class="muted">收官时间</span><span>' + App.escapeHtml(h.archivedAt || '—') + '</span></div>' +
+        '<div class="ci-archive-info-row"><span class="muted">成功打卡</span><span>' + successCount + ' 天</span></div>' +
+        '<div class="ci-archive-info-row"><span class="muted">每天份数</span><span>' + (h.parts || 1) + ' 份</span></div>' +
+        '</div>';
+      // 成功日期列表
+      html += '<div class="ci-archive-section-title">成功打卡日期</div>';
+      if (successList.length) {
+        html += '<div class="ci-archive-dates">' + successList.map((d) =>
+          '<span class="ci-archive-date">' + App.escapeHtml(d) + '</span>'
+        ).join('') + '</div>';
+      } else {
+        html += '<p class="muted ci-empty">无成功打卡记录。</p>';
+      }
+      // 完整日历（只读）：用 habit 视图的 paintCalendar 同款布局，传入 archived 的 records
+      html += '<div class="ci-archive-section-title">打卡日历</div>' +
+              '<div class="ci-cal ci-archive-cal" id="ci-archive-cal-inner"></div>';
+      archiveDetailView.innerHTML = html;
+      // 用同一渲染函数画日历
+      paintArchiveCalendar(h);
+    }
+    // 把已收官习惯的 records 临时挂到 records[h.id]，复用 paintCalendar / updateDayCell（只画、不动其它习惯）
+    function paintArchiveCalendar(h) {
+      const cal = container.querySelector('#ci-archive-cal-inner');
+      if (!cal) return;
+      // 临时把 selHabit 切到这个 archived 习惯以便 paintCalendar 找到 records
+      // 注意：paintCalendar 用 selHabit()，所以我们临时把数据塞进去
+      const origSel = selHabitId;
+      const origRecords = records[h.id];
+      // 把 archived 的 records 合并到 records（不污染其它习惯）
+      records[h.id] = h.records || {};
+      // 临时把 habits 数组里也加一个虚拟条目
+      const tmpIdx = habits.findIndex((x) => x.id === h.id);
+      const origHabitsEntry = tmpIdx >= 0 ? habits[tmpIdx] : null;
+      if (tmpIdx < 0) habits.push(h); else habits[tmpIdx] = h;
+      selHabitId = h.id;
+      // 复用 paintCalendar / drawMonthLabels（它直接用 selHabit()）
+      // 临时改 calEl 指向 archive-cal-inner
+      const origCalEl = calEl;
+      const realCal = container.querySelector('#ci-cal');
+      // 不能简单替换 calEl：paintCalendar 用的是 calEl（const）
+      // 改方案：直接画到 archive-cal 里
+      const headHtml = '<div class="ci-cal-head">' +
+        '<span class="ci-month-tag"></span>' +
+        WD.map((w) => '<span class="ci-weekday">' + w + '</span>').join('') +
+        '</div>';
+      const firstD = new Date(viewStartY, viewStartM, 1);
+      const lead = firstD.getDay();
+      const cells = [];
+      for (let i = 0; i < lead; i++) cells.push(null);
+      for (let i = 0; i < VIEW_MONTHS; i++) {
+        const { y, m } = normYearMonth(i);
+        const dim = new Date(y, m + 1, 0).getDate();
+        for (let d = 1; d <= dim; d++) cells.push({ y, m, d });
+      }
+      while (cells.length % 7 !== 0) cells.push(null);
+      const rows = cells.length / 7;
+      let body = '<div class="ci-grid-wrap"><div class="ci-grid">';
+      const t = todayStr();
+      for (let r = 0; r < rows; r++) {
+        const row = cells.slice(r * 7, (r + 1) * 7);
+        body += '<span class="ci-month-tag"></span>';
+        for (let c = 0; c < 7; c++) {
+          const cell = row[c];
+          if (!cell) { body += '<span class="ci-day empty"></span>'; continue; }
+          const ds = cell.y + '-' + pad(cell.m + 1) + '-' + pad(cell.d);
+          const depth = dayDepth(h, ds);
+          const cls = ['ci-day'];
+          if (cell.d === 1) cls.push('month-start');
+          if ((cell.m + 1) % 2 === 1) cls.push('m-odd'); else cls.push('m-even');
+          if (ds === t) cls.push('today');
+          if (depth >= 1) cls.push('full');
+          body += '<span class="' + cls.join(' ') + '" data-date="' + ds +
+            '" data-y="' + cell.y + '" data-m="' + cell.m + '" style="--depth:' + depth + '">' +
+            '<span class="ci-day-num">' + cell.d + '</span>' +
+            '<span class="ci-day-fill"></span>' +
+            '</span>';
+        }
+      }
+      body += '</div></div>';
+      cal.innerHTML = headHtml + body;
+      // 计算月份标签（复用 drawMonthLabels 但作用到 archive-cal 的 wrap）
+      drawMonthLabelsIn(cal);
+      // 滚到今天那行
+      requestAnimationFrame(() => {
+        const todayBtn = cal.querySelector('.ci-day[data-date="' + t + '"]');
+        if (todayBtn) {
+          const headH = (cal.querySelector('.ci-cal-head') || {}).offsetHeight || 0;
+          const cs = getComputedStyle(cal);
+          const borderT = cal.clientTop || 0;
+          const padT = parseFloat(cs.paddingTop) || 0;
+          const calRect = cal.getBoundingClientRect();
+          const aRect = todayBtn.getBoundingClientRect();
+          const rowCenterInCal = (aRect.top + aRect.height / 2) - (calRect.top + borderT + padT) + cal.scrollTop;
+          const target = Math.max(0, rowCenterInCal - (cal.clientHeight + headH) / 2);
+          cal.scrollTo({ top: target, behavior: 'auto' });
+        }
+      });
+      // 还原状态
+      if (origHabitsEntry) habits[tmpIdx] = origHabitsEntry; else habits.splice(habits.indexOf(h), 1);
+      if (origRecords) records[h.id] = origRecords; else delete records[h.id];
+      selHabitId = origSel;
+    }
+    // drawMonthLabels 的复用版：接受任意容器
+    function drawMonthLabelsIn(cal) {
+      const wrap = cal.querySelector('.ci-grid-wrap');
+      if (!wrap) return;
+      wrap.querySelectorAll('.ci-mlabel').forEach((e) => e.remove());
+      const days = Array.from(wrap.querySelectorAll('.ci-grid .ci-day:not(.empty)'));
+      if (!days.length) return;
+      const months = [];
+      days.forEach((btn) => {
+        const key = btn.dataset.y + '-' + btn.dataset.m;
+        let g = months[months.length - 1];
+        if (!g || g.key !== key) { g = { key: key, y: +btn.dataset.y, m: +btn.dataset.m, first: btn, last: btn }; months.push(g); }
+        else { g.last = btn; }
+      });
+      const wrapRect = wrap.getBoundingClientRect();
+      months.forEach((mo) => {
+        const a = mo.first.getBoundingClientRect();
+        const b = mo.last.getBoundingClientRect();
+        const cy = (a.top + b.bottom) / 2 - wrapRect.top;
+        const div = document.createElement('div');
+        div.className = 'ci-mlabel';
+        div.textContent = (mo.m + 1) + '月';
+        div.style.top = cy + 'px';
+        div.style.left = '0px';
+        wrap.appendChild(div);
+      });
     }
 
     // ---------- 日历 ----------
@@ -376,34 +604,49 @@ App.registerFeature({
       detailEl.innerHTML = html;
     }
 
-    function refresh() { paintHabits(); paintCalendar(); paintDetail(); }
+    function refresh() {
+      renderHead();
+      mainView.hidden = viewMode !== 'main';
+      archiveListView.hidden = viewMode !== 'archive-list';
+      archiveDetailView.hidden = viewMode !== 'archive-detail';
+      if (viewMode === 'main') {
+        paintHabits(); paintCalendar(); paintDetail();
+        // 每次进入主视图都把日历滚回今天（即使之前手动挪动过）
+        requestAnimationFrame(() => { if (calEl.isConnected) scrollToToday(); });
+      } else if (viewMode === 'archive-list') {
+        paintArchiveList();
+      } else if (viewMode === 'archive-detail') {
+        paintArchiveDetail(archiveDetailId);
+      }
+    }
 
     // ---------- 交互 ----------
-    // 记住每个习惯的日历滚动位置：不同项目的"日历视图"互不干扰
-    const habitScroll = {};
     habitsEl.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-id]');
+      // 点 ⋯ 编辑按钮 → 打开操作菜单
+      const menuBtn = e.target.closest('[data-menu]');
+      if (menuBtn) {
+        e.stopPropagation();
+        openEditSheet(menuBtn.dataset.menu);
+        return;
+      }
+      // 否则点习惯主体 → 切换到该习惯
+      const b = e.target.closest('.ci-habit-main[data-id]');
       if (!b) return;
       const newId = b.dataset.id;
       selDate = todayStr();
-      if (newId === selHabitId) {
-        // 点的是当前习惯：只刷新详情，**不重绘日历**（避免滚动位置被重置）
-        paintDetail();
-        return;
-      }
-      // 先记下当前习惯的滚动位置，再切换
-      if (selHabitId) habitScroll[selHabitId] = calEl.scrollTop;
       selHabitId = newId;
-      paintHabits();
-      paintCalendar();
-      paintDetail();
-      // 还原滚动位置；若是首次打开这个项目，则把"今天那一行"居中
-      if (habitScroll[newId] != null) {
-        calEl.scrollTop = habitScroll[newId];
-      } else {
-        scrollToToday();
-        habitScroll[newId] = calEl.scrollTop;
-      }
+      paintHabits(); paintCalendar(); paintDetail();
+      // 切到任一习惯都把日历滚回今天（用户要求：哪怕之前挪动过也要刷新）
+      requestAnimationFrame(() => { if (calEl.isConnected) scrollToToday(); });
+    });
+
+    // 点击已收官列表项 → 进入详情
+    archiveListView.addEventListener('click', (e) => {
+      const b = e.target.closest('.ci-archive-item[data-id]');
+      if (!b) return;
+      archiveDetailId = b.dataset.id;
+      viewMode = 'archive-detail';
+      refresh();
     });
 
     calEl.addEventListener('click', (e) => {
@@ -532,7 +775,7 @@ App.registerFeature({
         const v = labelInputs[i] && labelInputs[i].value.trim();
         labels.push(v || '');
       }
-      const habit = { id: 'h' + Date.now(), name: name, icon: pickIcon, parts: parts, labels: labels };
+      const habit = { id: 'h' + Date.now(), name: name, icon: pickIcon, parts: parts, labels: labels, createdAt: todayStr() };
       habits.push(habit); saveHabits();
       selHabitId = habit.id;
       closeModal();
@@ -540,12 +783,79 @@ App.registerFeature({
       refresh();
     });
 
-    container.querySelector('.ci-add').addEventListener('click', openModal);
+    // ---------- 编辑菜单（收官 / 删除） ----------
+    function openEditSheet(id) {
+      const h = habits.find((x) => x.id === id) || archived.find((x) => x.id === id);
+      if (!h) return;
+      sheetTargetId = id;
+      sheet.querySelector('#ci-sheet-title').textContent = (h.icon || '') + ' ' + (h.name || '');
+      sheet.hidden = false;
+    }
+    function closeEditSheet() {
+      sheet.hidden = true;
+      sheetTargetId = null;
+    }
+    sheet.addEventListener('click', (e) => {
+      const act = e.target.closest('[data-act]');
+      if (!act) return;
+      const a = act.dataset.act;
+      if (a === 'cancel') { closeEditSheet(); return; }
+      if (!sheetTargetId) { closeEditSheet(); return; }
+      if (a === 'archive') {
+        if (confirm('确定收官「' + (habits.find((x) => x.id === sheetTargetId) || {}).name + '」？\n收官后可在「已收官」中查看历史记录。')) {
+          archiveHabit(sheetTargetId);
+        }
+        closeEditSheet();
+      } else if (a === 'delete') {
+        const h = habits.find((x) => x.id === sheetTargetId);
+        if (!h) { closeEditSheet(); return; }
+        if (confirm('确定删除「' + h.name + '」？\n此操作不可恢复，所有打卡记录将一并删除。')) {
+          deleteHabit(sheetTargetId);
+        }
+        closeEditSheet();
+      }
+    });
+    // 收官：习惯移到 archived，records 一起搬过去
+    function archiveHabit(id) {
+      const idx = habits.findIndex((x) => x.id === id);
+      if (idx < 0) return;
+      const h = habits[idx];
+      const rec = records[id] || {};
+      const successDates = Object.keys(rec).filter((d) => rec[d] && rec[d].done).sort();
+      const archivedHabit = Object.assign({}, h, {
+        archivedAt: todayStr(),
+        records: rec,
+        successDates: successDates,
+      });
+      archived.push(archivedHabit);
+      saveArchived();
+      // 从活动列表移除
+      habits.splice(idx, 1);
+      saveHabits();
+      delete records[id];
+      saveRecords();
+      // 切换到下一个活动习惯
+      selHabitId = habits.length ? habits[0].id : null;
+      selDate = todayStr();
+      App.toast('已收官：' + h.name);
+      refresh();
+    }
+    // 删除：习惯 + records 全部清掉
+    function deleteHabit(id) {
+      const idx = habits.findIndex((x) => x.id === id);
+      if (idx < 0) return;
+      const h = habits[idx];
+      habits.splice(idx, 1);
+      saveHabits();
+      delete records[id];
+      saveRecords();
+      selHabitId = habits.length ? habits[0].id : null;
+      selDate = todayStr();
+      App.toast('已删除：' + h.name);
+      refresh();
+    }
 
     // ---------- 首次渲染 ----------
     refresh();
-    // 把"今天那一行"居中显示在日历小窗中间，并记下滚动位置
-    scrollToToday();
-    if (selHabitId) habitScroll[selHabitId] = calEl.scrollTop;
   }
 });
