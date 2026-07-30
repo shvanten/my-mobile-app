@@ -448,6 +448,24 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   line-height: 1;
 }
 .ci-month-tag:empty { visibility: hidden; }
+
+/* 竖向居中的月份标签：落在左列、按每个月区块的垂直中心排布（从 7 列左侧整列居中向下排） */
+.ci-mlabel {
+  position: absolute;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--accent-deep);
+}
 .ci-weekday {
   text-align: center;
   font-size: 11px;
