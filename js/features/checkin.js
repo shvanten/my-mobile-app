@@ -200,33 +200,30 @@ App.registerFeature({
       return { y, m };
     }
     function monthTagText(y, m) { return (m + 1) + '月'; }
-    // 渲染单个"月份块"
-    function renderMonthBlock(y, m, habit) {
+    // 渲染单个"月份块"：不再带星期表头，直接与上/下月首尾相连；第一行月份标签列写月份数字
+    function renderMonthBlock(y, m, habit, isCurrent, isAlt) {
       const t = todayStr();
       const cells = monthCells(y, m);
       const monthLabel = monthTagText(y, m);
       const rows = Math.ceil(cells.length / 7);
-      let html = '<div class="ci-month-block" data-y="' + y + '" data-m="' + m + '">';
-      // 周标签行（顶部固定）：月份标签列空白 + 日一二三四五六
-      html += '<div class="ci-month-row ci-month-week">' +
-        '<span class="ci-month-tag"></span>' +
-        WD.map((w) => '<span class="ci-weekday">' + w + '</span>').join('') +
-        '</div>';
+      const cls = ['ci-month-block'];
+      if (isCurrent) cls.push('current');
+      if (isAlt) cls.push('alt');
+      let html = '<div class="' + cls.join(' ') + '" data-y="' + y + '" data-m="' + m + '">';
       // 日期网格（按 7 个一组分行，每行前加月份标签列：第一行写月份，其他行占位空）
       for (let r = 0; r < rows; r++) {
         html += '<div class="ci-month-row">';
-        // 月份标签列：第一行写月份数字，其他行保留网格占位但内容空
         html += '<span class="ci-month-tag">' + (r === 0 ? monthLabel : '') + '</span>';
         for (let c = 0; c < 7; c++) {
           const d = cells[r * 7 + c];
           if (!d) { html += '<span class="ci-day empty"></span>'; continue; }
           const ds = fmt(d);
           const depth = dayDepth(habit, ds);
-          const cls = ['ci-day'];
-          if (ds === t) cls.push('today');
-          if (ds === selDate) cls.push('selected');
-          if (depth >= 1) cls.push('full');
-          html += '<button class="' + cls.join(' ') + '" type="button" data-date="' + ds + '" style="--depth:' + depth + '">' +
+          const dayCls = ['ci-day'];
+          if (ds === t) dayCls.push('today');
+          if (ds === selDate) dayCls.push('selected');
+          if (depth >= 1) dayCls.push('full');
+          html += '<button class="' + dayCls.join(' ') + '" type="button" data-date="' + ds + '" style="--depth:' + depth + '">' +
             '<span class="ci-day-num">' + d.getDate() + '</span>' +
             '<span class="ci-day-fill"></span>' +
             '</button>';
@@ -247,20 +244,93 @@ App.registerFeature({
     function paintCalendar() {
       const h = selHabit();
       if (!h) { calEl.innerHTML = ''; return; }
-      let html = '';
+      // 顶部统一的星期表头（吸顶），与月份行同 8 列网格（月份标签列 + 日一二三四五六）
+      const headHtml = '<div class="ci-cal-head">' +
+        '<span class="ci-month-tag"></span>' +
+        WD.map((w) => '<span class="ci-weekday">' + w + '</span>').join('') +
+        '</div>';
+      let html = headHtml;
       for (let i = 0; i < VIEW_MONTHS; i++) {
         const { y, m } = normYearMonth(i);
-        html += renderMonthBlock(y, m, h);
+        const isCurrent = (y === now.getFullYear() && m === now.getMonth());
+        const isAlt = (i % 2 === 1);
+        html += renderMonthBlock(y, m, h, isCurrent, isAlt);
       }
       calEl.innerHTML = html;
+      drawSeparators();
     }
-    // 滚动到指定 (年,月) 块
+    // 在月份交界处绘制"可弯折"的虚线：沿上下两月空格的轮廓走 L 形（先水平、再向下弯、再水平）
+    function drawSeparators() {
+      const old = calEl.querySelector('.ci-sep');
+      if (old) old.remove();
+      if (!calEl.isConnected) return;
+      const blocks = Array.from(calEl.querySelectorAll('.ci-month-block'));
+      if (blocks.length < 2) return;
+      const cs = getComputedStyle(calEl);
+      const padL = parseFloat(cs.paddingLeft) || 0;
+      const padT = parseFloat(cs.paddingTop) || 0;
+      const padR = parseFloat(cs.paddingRight) || 0;
+      const padB = parseFloat(cs.paddingBottom) || 0;
+      const borderT = calEl.clientTop || 0;
+      const borderL = calEl.clientLeft || 0;
+      const calRect = calEl.getBoundingClientRect();
+      const W = calEl.scrollWidth - padL - padR;
+      const H = calEl.scrollHeight - padT - padB;
+      const NS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('class', 'ci-sep');
+      svg.setAttribute('width', W);
+      svg.setAttribute('height', H);
+      // 让 svg 原点对齐到内容区左上角（减去边框 + padding）
+      svg.style.top = padT + 'px';
+      svg.style.left = padL + 'px';
+      // 把视口坐标转成"内容坐标"（含滚动偏移）
+      const toContent = (r) => ({
+        top: r.top - calRect.top - borderT - padT + calEl.scrollTop,
+        left: r.left - calRect.left - borderL - padL + calEl.scrollLeft,
+        bottom: r.bottom - calRect.top - borderT - padT + calEl.scrollTop,
+      });
+      let d = '';
+      for (let i = 0; i < blocks.length - 1; i++) {
+        const a = blocks[i], b = blocks[i + 1];
+        const aDays = a.querySelectorAll('.ci-day:not(.empty)');
+        const bDays = b.querySelectorAll('.ci-day:not(.empty)');
+        const aLastDay = aDays.length ? aDays[aDays.length - 1] : null;
+        const bFirstDay = bDays.length ? bDays[0] : null;
+        if (!aLastDay || !bFirstDay) continue;
+        const aRow = aLastDay.closest('.ci-month-row');
+        const bRow = bFirstDay.closest('.ci-month-row');
+        const aR = toContent(aRow.getBoundingClientRect());
+        const bR = toContent(bRow.getBoundingClientRect());
+        const bD = toContent(bFirstDay.getBoundingClientRect());
+        const yBottomA = aR.bottom;          // 上一月最后一行的下边缘
+        const yTopB = bR.top;                // 下一月第一行的上边缘
+        const xBend = bD.left;               // 下一月首个日期左缘 = 弯折点
+        d += 'M0 ' + yBottomA +
+             ' L' + xBend + ' ' + yBottomA +
+             ' L' + xBend + ' ' + yTopB +
+             ' L' + W + ' ' + yTopB + ' ';
+      }
+      if (!d) return;
+      const path = document.createElementNS(NS, 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('class', 'ci-sep-path');
+      svg.appendChild(path);
+      calEl.appendChild(svg);
+    }
+    // 窗口尺寸变化时重算虚线位置
+    let sepRaf = 0;
+    window.addEventListener('resize', () => {
+      if (sepRaf) cancelAnimationFrame(sepRaf);
+      sepRaf = requestAnimationFrame(() => { if (calEl.isConnected) drawSeparators(); });
+    });
+    // 滚动到指定 (年,月) 块（避开吸顶星期表头）
     function scrollToMonth(y, m) {
       const block = calEl.querySelector('[data-y="' + y + '"][data-m="' + m + '"]');
       if (block && calEl.scrollTo) {
-        // 滚动到该块，使月份标签刚好在视口顶部
-        const top = block.offsetTop;
-        calEl.scrollTo({ top, behavior: 'smooth' });
+        const head = calEl.querySelector('.ci-cal-head');
+        const headH = head ? head.offsetHeight : 0;
+        calEl.scrollTo({ top: Math.max(0, block.offsetTop - headH), behavior: 'smooth' });
       }
     }
 
