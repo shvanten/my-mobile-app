@@ -1,10 +1,12 @@
-const CACHE = 'myapp-v30';
+const CACHE = 'myapp-v31';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './js/app.js',
   './js/features/checkin.js',
+  './js/features/mood.js',
+  './js/features/ledger.js',
   './manifest.json',
   './assets/icon.svg'
 ];
