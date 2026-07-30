@@ -277,24 +277,26 @@ App.registerFeature({
       if (!b) return;
       const id = b.dataset.del;
       const r = state.records.find((x) => x.id === id);
-      if (r && confirm('删除这笔「' + r.cat + ' ' + money(r.amount) + '」记录？')) {
+      if (!r) return;
+      App.confirm('删除记录', '确认删除这笔「' + r.cat + ' ' + money(r.amount) + '」？', () => {
         state.records = state.records.filter((x) => x.id !== id);
         save();
         paintBalance();
         paintRecords();
-      paintSummary();
-      }
+        paintSummary();
+        App.toast('已删除');
+      });
     });
 
     // ---------- 设置存款（初始余额） ----------
     container.querySelector('#lg-set').addEventListener('click', () => {
-      const v = prompt('设置初始存款（基准余额，不包含下列记录）：', String(state.init));
-      if (v === null) return;
-      const n = parseFloat(v);
-      if (isNaN(n)) { App.toast('请输入数字'); return; }
-      state.init = Math.round(n * 100) / 100;
-      save();
-      paintBalance();
+      App.prompt('设置初始存款', state.init, (n) => {
+        if (n == null || isNaN(n)) { App.toast('请输入数字'); return; }
+        state.init = Math.round(n * 100) / 100;
+        save();
+        paintBalance();
+        App.toast('已设置存款为 ' + money(state.init));
+      }, { type: 'number', hint: '设置后会作为余额起点，加上后面所有收入减去支出 = 当前存款。' });
     });
 
     // ---------- 首次渲染 ----------

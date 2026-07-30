@@ -1482,3 +1482,50 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   font-size: 14px; font-weight: 800; color: var(--text-strong);
   margin-top: 6px; padding-left: 2px;
 }
+
+/* ============================================================
+   全局弹层（App.confirm / App.prompt）
+   ============================================================ */
+.app-modal-mask {
+  position: fixed; inset: 0; z-index: 60; background: rgba(20, 30, 22, .35);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.app-modal {
+  width: 100%; max-width: 360px; background: var(--surface);
+  border-radius: var(--radius); padding: 18px; box-shadow: 0 12px 36px rgba(20, 30, 22, .25);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.app-modal-title { font-size: 16px; font-weight: 700; color: var(--text-strong); }
+.app-modal-body { font-size: 14px; line-height: 1.6; color: var(--text); }
+.app-modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+.app-modal-actions .btn { flex: 1; }
+.app-modal-form { display: flex; flex-direction: column; gap: 8px; }
+.app-modal-hint { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.app-modal-form input {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); color: var(--text);
+  padding: 10px 12px; font: inherit; font-size: 14px; outline: none;
+}
+.app-modal-form input:focus { border-color: var(--accent); }
+
+/* 便签 chip 上的「×删除」入口（不破坏 chip 主体可点击） */
+.nn-chip { display: inline-flex; align-items: center; gap: 4px; }
+.nn-chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  font-size: 11px; line-height: 1; cursor: pointer;
+  background: rgba(0, 0, 0, .10); color: inherit; flex-shrink: 0;
+  user-select: none;
+}
+.nn-chip-x:active { background: rgba(0, 0, 0, .22); }
+.nn-chip.on .nn-chip-x { background: rgba(255, 255, 255, .30); }
+
+/* 便签类型编辑：图标选择器 */
+.nn-type-icons {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+}
+.nn-type-icon {
+  border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 8px; font-size: 18px; padding: 4px 0; cursor: pointer; line-height: 1;
+}
+.nn-type-icon.on { background: var(--accent); border-color: var(--accent); }

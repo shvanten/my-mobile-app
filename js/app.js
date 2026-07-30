@@ -117,6 +117,93 @@
     toast('在 js/features 新建一个 .js 文件，调用 App.registerFeature({...})，再到 index.html 加一行 <script> 引入即可。');
   }
 
+  // ===== 自定义弹层（iOS/安卓 PWA 都不支持原生 confirm/prompt） =====
+  function ensureModal() {
+    let mask = document.getElementById('app-modal');
+    if (mask) return mask;
+    mask = document.createElement('div');
+    mask.id = 'app-modal';
+    mask.className = 'app-modal-mask';
+    mask.hidden = true;
+    mask.innerHTML =
+      '<div class="app-modal" role="dialog" aria-modal="true">' +
+      '  <div class="app-modal-title" id="app-modal-title"></div>' +
+      '  <div class="app-modal-body" id="app-modal-body"></div>' +
+      '  <div class="app-modal-actions" id="app-modal-actions"></div>' +
+      '</div>';
+    document.body.appendChild(mask);
+    mask.addEventListener('click', (e) => { if (e.target === mask) closeModal(); });
+    return mask;
+  }
+  function openModal(opts) {
+    const mask = ensureModal();
+    mask.querySelector('#app-modal-title').textContent = opts.title || '';
+    const bodyEl = mask.querySelector('#app-modal-body');
+    bodyEl.innerHTML = '';
+    if (opts.body) {
+      if (typeof opts.body === 'string') bodyEl.innerHTML = opts.body;
+      else bodyEl.appendChild(opts.body);
+    }
+    const actionsEl = mask.querySelector('#app-modal-actions');
+    actionsEl.innerHTML = '';
+    (opts.actions || []).forEach((a) => {
+      const b = document.createElement('button');
+      b.className = 'btn ' + (a.kind || '');
+      b.type = 'button';
+      b.textContent = a.text;
+      b.addEventListener('click', () => {
+        if (a.onClick) a.onClick();
+        if (a.close !== false) closeModal();
+      });
+      actionsEl.appendChild(b);
+    });
+    mask.hidden = false;
+  }
+  function closeModal() {
+    const mask = document.getElementById('app-modal');
+    if (mask) mask.hidden = true;
+  }
+  // 确认弹层：title + msg + 确定(默认 danger 红) / 取消
+  function confirmDialog(title, msg, onYes, opts) {
+    const danger = !opts || opts.danger !== false;
+    openModal({
+      title: title,
+      body: '<p style="margin:0;font-size:14px;line-height:1.6">' + escapeHtml(msg) + '</p>',
+      actions: [
+        { text: (opts && opts.cancelText) || '取消', kind: 'ghost' },
+        { text: (opts && opts.okText) || '确定', kind: danger ? 'danger' : '', onClick: onYes },
+      ],
+    });
+  }
+  // 输入弹层：title + hint + defaultVal + type(text/number) + onValue(value)
+  function promptDialog(title, defaultVal, onValue, opts) {
+    const wrap = document.createElement('div');
+    wrap.className = 'app-modal-form';
+    const type = (opts && opts.type) || 'text';
+    const hint = opts && opts.hint;
+    wrap.innerHTML =
+      (hint ? '<p class="app-modal-hint">' + escapeHtml(hint) + '</p>' : '') +
+      '<input id="app-modal-input" type="' + type + '"' +
+      (type === 'number' ? ' inputmode="decimal" step="0.01" min="0"' : '') +
+      ' value="' + escapeHtml(defaultVal == null ? '' : String(defaultVal)) + '" />';
+    openModal({
+      title: title,
+      body: wrap,
+      actions: [
+        { text: '取消', kind: 'ghost' },
+        { text: '确定', kind: '', onClick: () => {
+          const raw = wrap.querySelector('#app-modal-input').value;
+          const v = (type === 'number') ? parseFloat(raw) : raw;
+          if (onValue) onValue(v);
+        } },
+      ],
+    });
+    setTimeout(() => {
+      const inp = wrap.querySelector('#app-modal-input');
+      if (inp) { inp.focus(); if (type !== 'number') inp.select(); }
+    }, 80);
+  }
+
   // ===== 工具 =====
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) =>
@@ -151,6 +238,6 @@
   }
 
   // 暴露给功能模块使用的 API
-  const api = { registerFeature, navigate, getFeatures: () => features, toast, escapeHtml };
+  const api = { registerFeature, navigate, getFeatures: () => features, toast, escapeHtml, confirm: confirmDialog, prompt: promptDialog, closeModal };
   window.App = api;
 })();

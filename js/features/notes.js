@@ -2,6 +2,7 @@
  * 小说拆文便签：
  * - 把摘抄 / 总结的「语句、词句、技巧」写成便签。
  * - 便签可以归入分类（比如属于哪篇文章），可按分类、类型筛选。
+ * - 分类和类型都可以新增/删除（点 chip 上的 ×）。
  * - 内置一份「知乎盐言故事热门榜单」参考页，可一键把榜单作品收藏为分类。
  */
 App.registerFeature({
@@ -14,13 +15,22 @@ App.registerFeature({
     const KEY = 'novelnotes.v1';
 
     // ---------- 存储 ----------
-    // { cats:[{id,name}], notes:[{id,text,type,catId,createdAt}] }
+    // { cats:[{id,name}], types:[{id,name,icon}], notes:[{id,text,type,catId,createdAt}] }
+    const DEFAULT_TYPES = [
+      { id: 'sent', name: '语句', icon: '💬' },
+      { id: 'word', name: '词句', icon: '✨' },
+      { id: 'tech', name: '技巧', icon: '🛠️' },
+    ];
+    const TYPE_ICONS = ['💬', '✨', '🛠️', '💡', '📖', '🎭', '🌟', '🔮', '💎', '🪶', '🪞', '🧩', '🪄', '🗝️', '🧵'];
     function load() {
       try {
         const d = JSON.parse(localStorage.getItem(KEY));
-        if (d && Array.isArray(d.cats) && Array.isArray(d.notes)) return d;
+        if (d && Array.isArray(d.cats) && Array.isArray(d.notes)) {
+          if (!Array.isArray(d.types) || !d.types.length) d.types = DEFAULT_TYPES.slice();
+          return d;
+        }
       } catch (e) { /* ignore */ }
-      return { cats: [], notes: [] };
+      return { cats: [], types: DEFAULT_TYPES.slice(), notes: [] };
     }
     function save() { localStorage.setItem(KEY, JSON.stringify(data)); }
     let data = load();
@@ -35,36 +45,28 @@ App.registerFeature({
       const c = data.cats.find((c) => c.id === id);
       return c ? c.name : '';
     }
-
-    // 便签类型
-    const TYPES = [
-      { id: 'sent', name: '语句', icon: '💬' },   // 摘抄的句子 / 段落
-      { id: 'word', name: '词句', icon: '✨' },   // 好词好短语
-      { id: 'tech', name: '技巧', icon: '🛠️' },  // 写作技巧 / 拆文总结
-    ];
-    function typeOf(id) { return TYPES.find((t) => t.id === id) || TYPES[0]; }
+    function typeOf(id) { return data.types.find((t) => t.id === id) || data.types[0]; }
 
     // ---------- 知乎盐言故事榜单 ----------
     // 优先读取 data/rank.json（由每日自动抓取任务更新）；失败时用下面的内置快照兜底。
     const RANK = [
       { t: '承珠冠', a: '李迟迟', tag: '古言', d: '命中注定的弑君者 vs 忠犬追随者。「公主的珠冠，一样可以承载社稷江山。」' },
-      { t: '你已有取死之道', a: '海的鸽子', tag: '古言·爽文', d: '鲨穿了的追妻火葬场女主 vs 一言不合就被鲨的男主们。「当追妻火葬场女主决定当女帝。」' },
+      { t: '你已有取死之道', a: '海的鸽子', tag: '古言·爽文', d: '鲨穿了的追妻火葬场女主 vs 一言不合就被鲨的男主们。' },
       { t: '吃人心的小妖怪', a: '女巫', tag: '志怪', d: '心软小妖怪 vs 淳朴善良村民。「吃人心的小妖怪死了，土庙里却多了个小神仙。」' },
-      { t: '山回路转不见鸡', a: '旺旺大队长', tag: '仙侠·种田', d: '捡个男人只为种地的女主 vs 拧巴清冷无情道仙尊。「和离后，无情道前夫给我送了个男人。」' },
-      { t: '阿缨', a: '鸠森', tag: '古言', d: '真心错付落魄贵女 vs 纨绔但护短小狗弟弟。「误以为未婚夫要我改嫁，我嫁给了他弟弟。」' },
-      { t: '沙洲秘事', a: '应不染', tag: '悬疑·IP榜', d: '入选 2026「最具转化价值文学IP推荐榜」，并入选中国作协网络文学重点扶持项目。' },
-      { t: '死到临头', a: '咸良', tag: '悬疑', d: '悬疑感十足，大银幕转化价值高；作者前作《恶女阿尤》改编电影《恶意》票房 2.54 亿。' },
-      { t: '锦绣南洋', a: '迷路', tag: '年代·家国', d: '细腻笔触描摹华人闯荡海外的拼搏史诗，兼具年代质感和家国情怀。' },
-      { t: '相亲夜校', a: '胡阿花', tag: '都市', d: '入选 IP 榜剧情都市赛道，贴近市场、接地气、共情力强。' },
-      { t: '照殿红', a: '盐选热门', tag: '脑洞·短篇', d: '女主手握照殿红四次穿越的时空闭环设定，知乎盐选超火短篇。' },
-      { t: '洗铅华', a: '盐选爆款', tag: '古言', d: '与《掌中之物》《娇藏》同为日均阅读量超 2000 万次的盐选爆款。' },
-      { t: '河清海晏', a: '盐言故事', tag: 'IP开发', d: '已出实体书 + 精品有声剧，真人长剧 2026 年内开机，全链路 IP 开发代表作。' },
+      { t: '山回路转不见鸡', a: '旺旺大队长', tag: '仙侠·种田', d: '捡个男人只为种地的女主 vs 拧巴清冷无情道仙尊。' },
+      { t: '阿缨', a: '鸠森', tag: '古言', d: '真心错付落魄贵女 vs 纨绔但护短小狗弟弟。' },
+      { t: '沙洲秘事', a: '应不染', tag: '悬疑·IP榜', d: '入选 2026「最具转化价值文学IP推荐榜」。' },
+      { t: '死到临头', a: '咸良', tag: '悬疑', d: '作者前作《恶女阿尤》改编电影《恶意》票房 2.54 亿。' },
+      { t: '照殿红', a: '盐选热门', tag: '脑洞·短篇', d: '女主手握照殿红四次穿越的时空闭环设定。' },
     ];
 
-    // 榜单数据：{ updatedAt, source, lists:[{name, items:[{t,a,tag,d}]}] }
     let rankData = {
       updatedAt: '2026-07-30（内置快照）',
-      lists: [{ name: '盐言故事 · 热门作品', items: RANK }],
+      lists: [
+        { name: '热度榜', items: RANK.slice(0, 5) },
+        { name: '新书榜', items: RANK.slice(5, 8) },
+        { name: '推荐榜', items: RANK.slice(0, 3).concat(RANK.slice(6, 8)) },
+      ],
     };
     fetch('data/rank.json', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
@@ -103,21 +105,29 @@ App.registerFeature({
     }));
 
     // ---------- 便签页 ----------
+    function catChip(id, name) {
+      return '<button class="nn-chip' + (filterCat === id ? ' on' : '') + '" data-fc="' + id + '" type="button">' +
+        '<span class="nn-chip-text">📁 ' + App.escapeHtml(name) + '</span>' +
+        '<span class="nn-chip-x" data-delcat="' + id + '" role="button" aria-label="删除分类" title="删除分类">×</span>' +
+        '</button>';
+    }
+    function typeChip(id, name, icon) {
+      return '<button class="nn-chip sm' + (filterType === id ? ' on' : '') + '" data-ft="' + id + '" type="button">' +
+        '<span class="nn-chip-text">' + icon + ' ' + App.escapeHtml(name) + '</span>' +
+        '<span class="nn-chip-x" data-deltype="' + id + '" role="button" aria-label="删除类型" title="删除类型">×</span>' +
+        '</button>';
+    }
+
     function paintNotes() {
       const catChips =
         '<button class="nn-chip' + (filterCat === 'all' ? ' on' : '') + '" data-fc="all" type="button">全部</button>' +
-        data.cats.map((c) =>
-          '<button class="nn-chip' + (filterCat === c.id ? ' on' : '') + '" data-fc="' + c.id + '" type="button">📁 ' +
-          App.escapeHtml(c.name) + '</button>'
-        ).join('') +
+        data.cats.map((c) => catChip(c.id, c.name)).join('') +
         '<button class="nn-chip nn-chip-add" data-addcat="1" type="button">＋分类</button>';
 
       const typeChips =
         '<button class="nn-chip sm' + (filterType === 'all' ? ' on' : '') + '" data-ft="all" type="button">全部类型</button>' +
-        TYPES.map((t) =>
-          '<button class="nn-chip sm' + (filterType === t.id ? ' on' : '') + '" data-ft="' + t.id + '" type="button">' +
-          t.icon + ' ' + t.name + '</button>'
-        ).join('');
+        data.types.map((t) => typeChip(t.id, t.name, t.icon)).join('') +
+        '<button class="nn-chip sm nn-chip-add" data-addtype="1" type="button">＋类型</button>';
 
       let list = data.notes.slice().sort((a, b) => b.createdAt - a.createdAt);
       if (filterCat !== 'all') list = list.filter((n) => n.catId === filterCat);
@@ -129,7 +139,7 @@ App.registerFeature({
             const cn = catName(n.catId);
             return '<div class="nn-note c' + (i % 5) + (i % 2 ? ' tilt-r' : ' tilt-l') + '" data-id="' + n.id + '">' +
               '  <div class="nn-note-top">' +
-              '    <span class="nn-note-type">' + t.icon + ' ' + t.name + '</span>' +
+              '    <span class="nn-note-type">' + t.icon + ' ' + App.escapeHtml(t.name) + '</span>' +
               '    <span class="nn-note-ops">' +
               '      <button class="nn-op" data-edit="' + n.id + '" type="button" aria-label="编辑">✏️</button>' +
               '      <button class="nn-op" data-del="' + n.id + '" type="button" aria-label="删除">✕</button>' +
@@ -153,21 +163,65 @@ App.registerFeature({
         '<button class="nn-fab" id="nn-add" type="button" aria-label="新建便签">＋</button>';
 
       // 筛选
-      bodyEl.querySelectorAll('[data-fc]').forEach((b) => b.addEventListener('click', () => {
+      bodyEl.querySelectorAll('[data-fc]').forEach((b) => b.addEventListener('click', (e) => {
+        if (e.target.closest('[data-delcat]')) return;  // 点 × 不触发筛选
         filterCat = b.dataset.fc; paintNotes();
       }));
-      bodyEl.querySelectorAll('[data-ft]').forEach((b) => b.addEventListener('click', () => {
+      bodyEl.querySelectorAll('[data-ft]').forEach((b) => b.addEventListener('click', (e) => {
+        if (e.target.closest('[data-deltype]')) return; // 点 × 不触发筛选
         filterType = b.dataset.ft; paintNotes();
       }));
-      // 新建分类（长按分类 chip 可删除/改名 —— 简化为点击＋分类新建，长按暂不做）
+      // 删除分类（点 chip 上的 ×）
+      bodyEl.querySelectorAll('[data-delcat]').forEach((b) => b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = b.dataset.delcat;
+        const cat = data.cats.find((c) => c.id === id);
+        if (!cat) return;
+        const noteCount = data.notes.filter((n) => n.catId === id).length;
+        const tip = noteCount
+          ? '分类「' + cat.name + '」下有 ' + noteCount + ' 张便签，删除后这些便签会改为「无分类」。继续？'
+          : '删除分类「' + cat.name + '」？';
+        App.confirm('删除分类', tip, () => {
+          data.notes.forEach((n) => { if (n.catId === id) n.catId = ''; });
+          data.cats = data.cats.filter((c) => c.id !== id);
+          if (filterCat === id) filterCat = 'all';
+          save(); paintNotes();
+          App.toast('已删除分类');
+        });
+      }));
+      // 删除类型（点 chip 上的 ×）
+      bodyEl.querySelectorAll('[data-deltype]').forEach((b) => b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = b.dataset.deltype;
+        const t = data.types.find((x) => x.id === id);
+        if (!t) return;
+        if (data.types.length <= 1) { App.toast('至少保留一个类型'); return; }
+        const noteCount = data.notes.filter((n) => n.type === id).length;
+        const fallback = data.types.find((x) => x.id !== id) || DEFAULT_TYPES[0];
+        const tip = noteCount
+          ? '类型「' + t.name + '」下有 ' + noteCount + ' 张便签，删除后会改为「' + fallback.name + '」。继续？'
+          : '删除类型「' + t.name + '」？';
+        App.confirm('删除类型', tip, () => {
+          data.notes.forEach((n) => { if (n.type === id) n.type = fallback.id; });
+          data.types = data.types.filter((x) => x.id !== id);
+          if (filterType === id) filterType = 'all';
+          save(); paintNotes();
+          App.toast('已删除类型');
+        });
+      }));
+      // 新建分类
       const addCatBtn = bodyEl.querySelector('[data-addcat]');
       if (addCatBtn) addCatBtn.addEventListener('click', () => {
-        const name = prompt('新分类名称（比如某篇文章名）：');
-        if (!name || !name.trim()) return;
-        addCat(name.trim());
-        paintNotes();
+        App.prompt('新建分类', '', (v) => {
+          if (!v || !v.trim()) return;
+          addCat(v.trim());
+          paintNotes();
+        }, { hint: '比如某篇文章名、某个作者、某个题材。' });
       });
-      // 新建 / 编辑 / 删除
+      // 新建类型
+      const addTypeBtn = bodyEl.querySelector('[data-addtype]');
+      if (addTypeBtn) addTypeBtn.addEventListener('click', () => openTypeEditor(null));
+      // 新建 / 编辑 / 删除便签
       bodyEl.querySelector('#nn-add').addEventListener('click', () => openEditor(null));
       bodyEl.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -176,9 +230,11 @@ App.registerFeature({
       }));
       bodyEl.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!confirm('删除这张便签？')) return;
-        data.notes = data.notes.filter((x) => x.id !== b.dataset.del);
-        save(); paintNotes();
+        App.confirm('删除便签', '确认删除这张便签？', () => {
+          data.notes = data.notes.filter((x) => x.id !== b.dataset.del);
+          save(); paintNotes();
+          App.toast('已删除');
+        });
       }));
     }
 
@@ -189,6 +245,54 @@ App.registerFeature({
       data.cats.push(c);
       save();
       return c.id;
+    }
+
+    // ---------- 新建 / 编辑类型（弹层选 icon + name） ----------
+    function openTypeEditor(existing) {
+      const isNew = !existing;
+      const wrap = document.createElement('div');
+      wrap.className = 'nn-mask';
+      let curIcon = existing ? existing.icon : TYPE_ICONS[0];
+      const iconBtns = TYPE_ICONS.map((ic) =>
+        '<button class="nn-type-icon' + (ic === curIcon ? ' on' : '') + '" data-icon="' + ic + '" type="button">' + ic + '</button>'
+      ).join('');
+      wrap.innerHTML =
+        '<div class="nn-sheet">' +
+        '  <h3>' + (isNew ? '新建类型' : '编辑类型') + '</h3>' +
+        '  <p class="muted" style="margin:0;font-size:12px">挑一个图标，再起个名字</p>' +
+        '  <div class="nn-type-icons">' + iconBtns + '</div>' +
+        '  <input id="nn-t-name" class="lg-note" type="text" maxlength="8" placeholder="类型名（如 套路 / 节奏）" value="' + (existing ? App.escapeHtml(existing.name) : '') + '" />' +
+        '  <div class="nn-e-btns">' +
+        '    <button class="btn ghost" id="nn-t-cancel" type="button">取消</button>' +
+        '    <button class="btn" id="nn-t-ok" type="button">保存</button>' +
+        '  </div>' +
+        '</div>';
+      document.body.appendChild(wrap);
+      const nameEl = wrap.querySelector('#nn-t-name');
+      wrap.querySelector('.nn-type-icons').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-icon]');
+        if (!b) return;
+        curIcon = b.dataset.icon;
+        wrap.querySelectorAll('.nn-type-icon').forEach((x) => x.classList.toggle('on', x === b));
+      });
+      function close() { wrap.remove(); }
+      wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+      wrap.querySelector('#nn-t-cancel').addEventListener('click', close);
+      wrap.querySelector('#nn-t-ok').addEventListener('click', () => {
+        const name = nameEl.value.trim();
+        if (!name) { App.toast('请输入类型名'); return; }
+        if (isNew) {
+          // 唯一 id
+          let id = uid();
+          while (data.types.some((t) => t.id === id)) id = uid();
+          data.types.push({ id, name, icon: curIcon });
+        } else {
+          existing.name = name; existing.icon = curIcon;
+        }
+        save(); close(); paintNotes();
+        App.toast(isNew ? '已添加类型' : '已更新类型');
+      });
+      setTimeout(() => nameEl.focus(), 60);
     }
 
     // ---------- 便签编辑弹层 ----------
@@ -202,9 +306,9 @@ App.registerFeature({
           '<option value="' + c.id + '"' + (note && note.catId === c.id ? ' selected' : '') + '>' +
           App.escapeHtml(c.name) + '</option>'
         ).join('');
-      const typeBtns = TYPES.map((t) =>
+      const typeBtns = data.types.map((t) =>
         '<button class="nn-chip sm' + ((note ? note.type : 'sent') === t.id ? ' on' : '') + '" data-t="' + t.id + '" type="button">' +
-        t.icon + ' ' + t.name + '</button>'
+        t.icon + ' ' + App.escapeHtml(t.name) + '</button>'
       ).join('');
       wrap.innerHTML =
         '<div class="nn-sheet">' +
@@ -224,7 +328,7 @@ App.registerFeature({
 
       const textEl = wrap.querySelector('#nn-e-text');
       const selEl = wrap.querySelector('#nn-e-sel');
-      let curType = note ? note.type : 'sent';
+      let curType = note ? note.type : (data.types[0] && data.types[0].id) || 'sent';
       if (note) textEl.value = note.text;
 
       wrap.querySelector('#nn-e-type').addEventListener('click', (e) => {
@@ -234,12 +338,13 @@ App.registerFeature({
         wrap.querySelectorAll('[data-t]').forEach((x) => x.classList.toggle('on', x === b));
       });
       wrap.querySelector('#nn-e-newcat').addEventListener('click', () => {
-        const name = prompt('新分类名称（比如某篇文章名）：');
-        if (!name || !name.trim()) return;
-        const id = addCat(name.trim());
-        const opt = document.createElement('option');
-        opt.value = id; opt.textContent = name.trim(); opt.selected = true;
-        selEl.appendChild(opt);
+        App.prompt('新建分类', '', (v) => {
+          if (!v || !v.trim()) return;
+          const id = addCat(v.trim());
+          const opt = document.createElement('option');
+          opt.value = id; opt.textContent = v.trim(); opt.selected = true;
+          selEl.appendChild(opt);
+        }, { hint: '比如某篇文章名、某个作者。' });
       });
       function close() { wrap.remove(); }
       wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
