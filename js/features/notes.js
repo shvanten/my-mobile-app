@@ -44,7 +44,8 @@ App.registerFeature({
     ];
     function typeOf(id) { return TYPES.find((t) => t.id === id) || TYPES[0]; }
 
-    // ---------- 知乎盐言故事榜单（抓取于 2026-07-30，静态快照） ----------
+    // ---------- 知乎盐言故事榜单 ----------
+    // 优先读取 data/rank.json（由每日自动抓取任务更新）；失败时用下面的内置快照兜底。
     const RANK = [
       { t: '承珠冠', a: '李迟迟', tag: '古言', d: '命中注定的弑君者 vs 忠犬追随者。「公主的珠冠，一样可以承载社稷江山。」' },
       { t: '你已有取死之道', a: '海的鸽子', tag: '古言·爽文', d: '鲨穿了的追妻火葬场女主 vs 一言不合就被鲨的男主们。「当追妻火葬场女主决定当女帝。」' },
@@ -59,6 +60,21 @@ App.registerFeature({
       { t: '洗铅华', a: '盐选爆款', tag: '古言', d: '与《掌中之物》《娇藏》同为日均阅读量超 2000 万次的盐选爆款。' },
       { t: '河清海晏', a: '盐言故事', tag: 'IP开发', d: '已出实体书 + 精品有声剧，真人长剧 2026 年内开机，全链路 IP 开发代表作。' },
     ];
+
+    // 榜单数据：{ updatedAt, source, lists:[{name, items:[{t,a,tag,d}]}] }
+    let rankData = {
+      updatedAt: '2026-07-30（内置快照）',
+      lists: [{ name: '盐言故事 · 热门作品', items: RANK }],
+    };
+    fetch('data/rank.json', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (j && Array.isArray(j.lists) && j.lists.length) {
+          rankData = j;
+          if (view === 'rank') paintRank();
+        }
+      })
+      .catch(() => { /* 离线时用内置快照 */ });
 
     // ---------- 状态 ----------
     let view = 'notes';        // notes | rank
@@ -244,21 +260,26 @@ App.registerFeature({
 
     // ---------- 榜单页 ----------
     function paintRank() {
-      bodyEl.innerHTML =
-        '<div class="nn-rank">' +
-        '  <p class="muted nn-rank-tip">知乎盐言故事 · 2026 热门作品（快照于 2026-07-30，来源：公开报道/榜单）。点「收藏为分类」即可给这本书建拆文分类。</p>' +
-        RANK.map((r, i) =>
+      const listsHtml = rankData.lists.map((L) =>
+        '<div class="nn-rank-list-name">' + App.escapeHtml(L.name) + '</div>' +
+        (L.items || []).map((r, i) =>
           '<div class="nn-rank-item">' +
           '  <div class="nn-rank-no">' + (i + 1) + '</div>' +
           '  <div class="nn-rank-main">' +
           '    <div class="nn-rank-title">《' + App.escapeHtml(r.t) + '》' +
-          '      <span class="nn-rank-tag">' + App.escapeHtml(r.tag) + '</span></div>' +
-          '    <div class="nn-rank-author muted">' + App.escapeHtml(r.a) + '</div>' +
-          '    <div class="nn-rank-desc">' + App.escapeHtml(r.d) + '</div>' +
+          (r.tag ? '<span class="nn-rank-tag">' + App.escapeHtml(r.tag) + '</span>' : '') + '</div>' +
+          (r.a ? '<div class="nn-rank-author muted">' + App.escapeHtml(r.a) + '</div>' : '') +
+          (r.d ? '<div class="nn-rank-desc">' + App.escapeHtml(r.d) + '</div>' : '') +
           '  </div>' +
           '  <button class="nn-chip sm nn-rank-fav" data-fav="' + App.escapeHtml(r.t) + '" type="button">收藏为分类</button>' +
           '</div>'
-        ).join('') +
+        ).join('')
+      ).join('');
+      bodyEl.innerHTML =
+        '<div class="nn-rank">' +
+        '  <p class="muted nn-rank-tip">知乎盐言故事榜单 · 更新于 ' + App.escapeHtml(rankData.updatedAt || '—') +
+        '（每天自动抓取，不含长篇榜）。点「收藏为分类」即可给这本书建拆文分类。</p>' +
+        listsHtml +
         '</div>';
 
       bodyEl.querySelectorAll('[data-fav]').forEach((b) => b.addEventListener('click', () => {

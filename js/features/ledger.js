@@ -74,6 +74,8 @@ App.registerFeature({
       '  </div>' +
       '  <div class="lg-cats-title">记一笔</div>' +
       '  <div class="lg-cats" id="lg-cats"></div>' +
+      '  <div class="lg-cats-title">消费总结</div>' +
+      '  <div class="lg-sum" id="lg-sum"></div>' +
       '  <div class="lg-rec-title">记录</div>' +
       '  <div class="lg-rec" id="lg-rec"></div>' +
       '  <div class="lg-sheet" id="lg-sheet" hidden>' +
@@ -107,9 +109,89 @@ App.registerFeature({
     // ---------- 余额 / 统计 ----------
     function paintBalance() {
       balNumEl.textContent = money(balance());
+      const ym = todayStr().slice(0, 7);
       let inc = 0, exp = 0;
-      state.records.forEach((r) => { if (r.type === 'inc') inc += r.amount; else exp += r.amount; });
+      state.records.forEach((r) => {
+        if (r.date.slice(0, 7) !== ym) return;
+        if (r.type === 'inc') inc += r.amount; else exp += r.amount;
+      });
       balSubEl.textContent = '本月收入 ' + money(inc) + ' · 支出 ' + money(exp);
+    }
+
+    // ---------- 消费总结（周/月/平均） ----------
+    // 某天所在自然周（周一开头）的周一日期，作为周的 key
+    function weekStart(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      const dow = (d.getDay() + 6) % 7;   // 0=周一
+      d.setDate(d.getDate() - dow);
+      return fmt(d);
+    }
+    function shortMD(dateStr) { return parseInt(dateStr.slice(5, 7), 10) + '.' + parseInt(dateStr.slice(8, 10), 10); }
+
+    function paintSummary() {
+      const sumEl = container.querySelector('#lg-sum');
+      if (!state.records.length) {
+        sumEl.innerHTML = '<p class="muted" style="margin:0">记几笔之后，这里会出现总结。</p>';
+        return;
+      }
+      const t = todayStr();
+      // 按周 / 按月分组
+      const byWeek = {};   // { 周一日期: {exp,inc} }
+      const byMonth = {};  // { 'YYYY-MM': {exp,inc} }
+      let firstDate = t, totalExp = 0;
+      state.records.forEach((r) => {
+        if (r.date < firstDate) firstDate = r.date;
+        const wk = weekStart(r.date);
+        const mo = r.date.slice(0, 7);
+        byWeek[wk] = byWeek[wk] || { exp: 0, inc: 0 };
+        byMonth[mo] = byMonth[mo] || { exp: 0, inc: 0 };
+        if (r.type === 'inc') { byWeek[wk].inc += r.amount; byMonth[mo].inc += r.amount; }
+        else { byWeek[wk].exp += r.amount; byMonth[mo].exp += r.amount; totalExp += r.amount; }
+      });
+      // 平均：从第一笔记录到今天的跨度
+      const msDay = 86400000;
+      const spanDays = Math.max(1, Math.round((new Date(t + 'T00:00:00') - new Date(firstDate + 'T00:00:00')) / msDay) + 1);
+      const spanWeeks = Math.max(1, Math.ceil(spanDays / 7));
+      const spanMonths = Math.max(1, ((+t.slice(0, 4) - +firstDate.slice(0, 4)) * 12 + (+t.slice(5, 7) - +firstDate.slice(5, 7))) + 1);
+      const dayAvg = totalExp / spanDays;
+      const weekAvg = totalExp / spanWeeks;
+      const monthAvg = totalExp / spanMonths;
+
+      // 每周总结：最近 6 个有记录的周（最近在前）
+      const weekKeys = Object.keys(byWeek).sort().reverse().slice(0, 6);
+      const curWeek = weekStart(t);
+      const weekRows = weekKeys.map((wk) => {
+        const d = new Date(wk + 'T00:00:00');
+        d.setDate(d.getDate() + 6);
+        const label = (wk === curWeek ? '本周 ' : '') + shortMD(wk) + '–' + shortMD(fmt(d));
+        return '<div class="lg-sum-row">' +
+          '<span class="lg-sum-name">' + label + '</span>' +
+          '<span class="lg-sum-exp">支出 ' + money(byWeek[wk].exp) + '</span>' +
+          '<span class="lg-sum-inc">收入 ' + money(byWeek[wk].inc) + '</span></div>';
+      }).join('');
+
+      // 每月总结：最近 6 个有记录的月（最近在前）
+      const monthKeys = Object.keys(byMonth).sort().reverse().slice(0, 6);
+      const curMonth = t.slice(0, 7);
+      const monthRows = monthKeys.map((mo) => {
+        const label = (mo === curMonth ? '本月 ' : '') + parseInt(mo.slice(5, 7), 10) + '月（' + mo.slice(0, 4) + '）';
+        return '<div class="lg-sum-row">' +
+          '<span class="lg-sum-name">' + label + '</span>' +
+          '<span class="lg-sum-exp">支出 ' + money(byMonth[mo].exp) + '</span>' +
+          '<span class="lg-sum-inc">收入 ' + money(byMonth[mo].inc) + '</span></div>';
+      }).join('');
+
+      sumEl.innerHTML =
+        '<div class="lg-sum-avgs">' +
+        '  <div class="lg-sum-avg"><b>' + money(dayAvg) + '</b><span>日均消费</span></div>' +
+        '  <div class="lg-sum-avg"><b>' + money(weekAvg) + '</b><span>周均消费</span></div>' +
+        '  <div class="lg-sum-avg"><b>' + money(monthAvg) + '</b><span>月均消费</span></div>' +
+        '</div>' +
+        '<div class="lg-sum-sub">自 ' + firstDate + ' 起，累计支出 ' + money(totalExp) + '（跨 ' + spanDays + ' 天）</div>' +
+        '<div class="lg-sum-row head"><span>每周总结</span><span></span><span></span></div>' +
+        '<div class="lg-sum-table">' + weekRows + '</div>' +
+        '<div class="lg-sum-row head"><span>每月总结</span><span></span><span></span></div>' +
+        '<div class="lg-sum-table">' + monthRows + '</div>';
     }
 
     // ---------- 分类网格 ----------
@@ -183,6 +265,7 @@ App.registerFeature({
       closeSheet();
       paintBalance();
       paintRecords();
+      paintSummary();
       App.toast('已记一笔：' + sheetCat.n + ' ' + money(amt));
     });
     // 回车直接确认
@@ -199,6 +282,7 @@ App.registerFeature({
         save();
         paintBalance();
         paintRecords();
+      paintSummary();
       }
     });
 
@@ -217,5 +301,6 @@ App.registerFeature({
     paintBalance();
     paintCats();
     paintRecords();
+    paintSummary();
   }
 });

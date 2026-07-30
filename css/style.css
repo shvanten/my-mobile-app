@@ -1149,3 +1149,336 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .nn-rank-author { font-size: 12px; margin-top: 2px; }
 .nn-rank-desc { font-size: 12.5px; line-height: 1.6; color: var(--text); margin-top: 4px; }
 .nn-rank-fav { align-self: center; white-space: nowrap; }
+
+/* ============================================================
+   心情日历 + 每周小结 + 近期可视化
+   ============================================================ */
+.btn.danger { background: #c0563f; color: #fff; }
+.btn.danger:active { background: #a8492f; }
+
+.mo-cal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 10px 12px;
+}
+.mo-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mo-cal-ym { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.mo-cal-nav {
+  width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); color: var(--text); font-size: 16px; cursor: pointer; line-height: 1;
+}
+.mo-cal-nav:active { background: var(--border); }
+.mo-cal-week {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 4px;
+}
+.mo-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.mo-cal-day {
+  min-height: 46px; border-radius: 8px; padding: 3px 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: var(--surface-2);
+}
+.mo-cal-day.empty { background: transparent; }
+.mo-cal-day.future { opacity: .4; }
+.mo-cal-day.has { background: color-mix(in srgb, #7aa6c2 16%, var(--surface-2)); cursor: pointer; }
+.mo-cal-day.has:active { background: color-mix(in srgb, #7aa6c2 30%, var(--surface-2)); }
+.mo-cal-day.today { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mo-cal-num { font-size: 11px; color: var(--muted); line-height: 1.2; }
+.mo-cal-day.today .mo-cal-num { color: var(--accent-deep); font-weight: 800; }
+[data-theme="dark"] .mo-cal-day.today .mo-cal-num { color: var(--accent-soft); }
+.mo-cal-emojis { font-size: 14px; line-height: 1.15; text-align: center; word-break: break-all; }
+.mo-cal-more { font-size: 9px; color: var(--muted); vertical-align: top; }
+
+/* 每周小结 */
+.mo-weeks { display: flex; flex-direction: column; gap: 6px; }
+.mo-week-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px;
+}
+.mo-week-name { font-weight: 700; color: var(--text-strong); white-space: nowrap; }
+.mo-week-name i { font-style: normal; font-weight: 400; font-size: 11px; color: var(--muted); }
+.mo-week-moods { flex: 1; min-width: 0; font-size: 14px; }
+.mo-week-days { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* 近期心情可视化 */
+.mo-viz {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.mo-viz-row { display: grid; grid-template-columns: 26px 34px 1fr 38px; align-items: center; gap: 6px; }
+.mo-viz-e { font-size: 18px; line-height: 1; }
+.mo-viz-n { font-size: 11px; color: var(--muted); }
+.mo-viz-bar { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.mo-viz-bar i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-soft), #7aa6c2);
+  transition: width .4s ease;
+}
+.mo-viz-c { font-size: 11px; color: var(--muted); text-align: right; }
+.mo-viz-total { font-size: 11px; margin: 2px 0 0; text-align: right; }
+
+/* 某天详情弹层 */
+.mo-mask {
+  position: fixed; inset: 0; z-index: 50; background: rgba(20, 30, 22, .35);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.mo-day-sheet {
+  width: 100%; max-width: 360px; background: var(--surface);
+  border-radius: var(--radius); padding: 18px; box-shadow: 0 12px 36px rgba(20,30,22,.25);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.mo-day-date { font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.mo-day-emojis { display: flex; flex-wrap: wrap; gap: 8px; font-size: 26px; line-height: 1; }
+.mo-day-note { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); }
+.mo-day-btns { display: flex; gap: 10px; }
+.mo-day-btns .btn { flex: 1; }
+
+/* ============================================================
+   记账总结（周/月/平均）
+   ============================================================ */
+.lg-sum {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.lg-sum-avgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lg-sum-avg {
+  background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.lg-sum-avg b { font-size: 15px; color: var(--text-strong); word-break: break-all; text-align: center; }
+.lg-sum-avg span { font-size: 11px; color: var(--muted); }
+.lg-sum-sub { font-size: 12px; color: var(--muted); }
+.lg-sum-table { display: flex; flex-direction: column; gap: 4px; }
+.lg-sum-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+  padding: 7px 10px; border-radius: 8px; background: var(--surface-2); font-size: 13px;
+}
+.lg-sum-row.head { background: transparent; font-size: 11px; color: var(--muted); padding: 2px 10px; }
+.lg-sum-name { color: var(--text-strong); font-weight: 600; }
+.lg-sum-exp { color: #c0563f; font-variant-numeric: tabular-nums; }
+.lg-sum-inc { color: var(--accent-deep); font-variant-numeric: tabular-nums; }
+[data-theme="dark"] .lg-sum-inc { color: var(--accent-soft); }
+
+/* ============================================================
+   心情日历 + 每周小结 + 近期可视化
+   ============================================================ */
+.btn.danger { background: #c0563f; color: #fff; }
+.btn.danger:active { background: #a8492f; }
+
+.mo-cal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 10px 12px;
+}
+.mo-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mo-cal-ym { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.mo-cal-nav {
+  width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); color: var(--text); font-size: 16px; cursor: pointer; line-height: 1;
+}
+.mo-cal-nav:active { background: var(--border); }
+.mo-cal-week {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 4px;
+}
+.mo-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.mo-cal-day {
+  min-height: 46px; border-radius: 8px; padding: 3px 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: var(--surface-2);
+}
+.mo-cal-day.empty { background: transparent; }
+.mo-cal-day.future { opacity: .4; }
+.mo-cal-day.has { background: color-mix(in srgb, #7aa6c2 16%, var(--surface-2)); cursor: pointer; }
+.mo-cal-day.has:active { background: color-mix(in srgb, #7aa6c2 30%, var(--surface-2)); }
+.mo-cal-day.today { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mo-cal-num { font-size: 11px; color: var(--muted); line-height: 1.2; }
+.mo-cal-day.today .mo-cal-num { color: var(--accent-deep); font-weight: 800; }
+[data-theme="dark"] .mo-cal-day.today .mo-cal-num { color: var(--accent-soft); }
+.mo-cal-emojis { font-size: 14px; line-height: 1.15; text-align: center; word-break: break-all; }
+.mo-cal-more { font-size: 9px; color: var(--muted); vertical-align: top; }
+
+/* 每周小结 */
+.mo-weeks { display: flex; flex-direction: column; gap: 6px; }
+.mo-week-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px;
+}
+.mo-week-name { font-weight: 700; color: var(--text-strong); white-space: nowrap; }
+.mo-week-name i { font-style: normal; font-weight: 400; font-size: 11px; color: var(--muted); }
+.mo-week-moods { flex: 1; min-width: 0; font-size: 14px; }
+.mo-week-days { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* 近期心情可视化 */
+.mo-viz {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.mo-viz-row { display: grid; grid-template-columns: 26px 34px 1fr 38px; align-items: center; gap: 6px; }
+.mo-viz-e { font-size: 18px; line-height: 1; }
+.mo-viz-n { font-size: 11px; color: var(--muted); }
+.mo-viz-bar { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.mo-viz-bar i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-soft), #7aa6c2);
+  transition: width .4s ease;
+}
+.mo-viz-c { font-size: 11px; color: var(--muted); text-align: right; }
+.mo-viz-total { font-size: 11px; margin: 2px 0 0; text-align: right; }
+
+/* 某天详情弹层 */
+.mo-mask {
+  position: fixed; inset: 0; z-index: 50; background: rgba(20, 30, 22, .35);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.mo-day-sheet {
+  width: 100%; max-width: 360px; background: var(--surface);
+  border-radius: var(--radius); padding: 18px; box-shadow: 0 12px 36px rgba(20,30,22,.25);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.mo-day-date { font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.mo-day-emojis { display: flex; flex-wrap: wrap; gap: 8px; font-size: 26px; line-height: 1; }
+.mo-day-note { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); }
+.mo-day-btns { display: flex; gap: 10px; }
+.mo-day-btns .btn { flex: 1; }
+
+/* ============================================================
+   记账总结（周/月/平均）
+   ============================================================ */
+.lg-sum {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.lg-sum-avgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lg-sum-avg {
+  background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.lg-sum-avg b { font-size: 15px; color: var(--text-strong); word-break: break-all; text-align: center; }
+.lg-sum-avg span { font-size: 11px; color: var(--muted); }
+.lg-sum-sub { font-size: 12px; color: var(--muted); }
+.lg-sum-table { display: flex; flex-direction: column; gap: 4px; }
+.lg-sum-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+  padding: 7px 10px; border-radius: 8px; background: var(--surface-2); font-size: 13px;
+}
+.lg-sum-row.head { background: transparent; font-size: 11px; color: var(--muted); padding: 2px 10px; }
+.lg-sum-name { color: var(--text-strong); font-weight: 600; }
+.lg-sum-exp { color: #c0563f; font-variant-numeric: tabular-nums; }
+.lg-sum-inc { color: var(--accent-deep); font-variant-numeric: tabular-nums; }
+[data-theme="dark"] .lg-sum-inc { color: var(--accent-soft); }
+
+/* ============================================================
+   心情日历 + 每周小结 + 近期可视化
+   ============================================================ */
+.btn.danger { background: #c0563f; color: #fff; }
+.btn.danger:active { background: #a8492f; }
+
+.mo-cal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 10px 12px;
+}
+.mo-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mo-cal-ym { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.mo-cal-nav {
+  width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-2); color: var(--text); font-size: 16px; cursor: pointer; line-height: 1;
+}
+.mo-cal-nav:active { background: var(--border); }
+.mo-cal-week {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;
+  font-size: 11px; color: var(--muted); text-align: center; margin-bottom: 4px;
+}
+.mo-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.mo-cal-day {
+  min-height: 46px; border-radius: 8px; padding: 3px 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  background: var(--surface-2);
+}
+.mo-cal-day.empty { background: transparent; }
+.mo-cal-day.future { opacity: .4; }
+.mo-cal-day.has { background: color-mix(in srgb, #7aa6c2 16%, var(--surface-2)); cursor: pointer; }
+.mo-cal-day.has:active { background: color-mix(in srgb, #7aa6c2 30%, var(--surface-2)); }
+.mo-cal-day.today { outline: 2px solid var(--accent); outline-offset: -2px; }
+.mo-cal-num { font-size: 11px; color: var(--muted); line-height: 1.2; }
+.mo-cal-day.today .mo-cal-num { color: var(--accent-deep); font-weight: 800; }
+[data-theme="dark"] .mo-cal-day.today .mo-cal-num { color: var(--accent-soft); }
+.mo-cal-emojis { font-size: 14px; line-height: 1.15; text-align: center; word-break: break-all; }
+.mo-cal-more { font-size: 9px; color: var(--muted); vertical-align: top; }
+
+/* 每周小结 */
+.mo-weeks { display: flex; flex-direction: column; gap: 6px; }
+.mo-week-row {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 12px; font-size: 13px;
+}
+.mo-week-name { font-weight: 700; color: var(--text-strong); white-space: nowrap; }
+.mo-week-name i { font-style: normal; font-weight: 400; font-size: 11px; color: var(--muted); }
+.mo-week-moods { flex: 1; min-width: 0; font-size: 14px; }
+.mo-week-days { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* 近期心情可视化 */
+.mo-viz {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.mo-viz-row { display: grid; grid-template-columns: 26px 34px 1fr 38px; align-items: center; gap: 6px; }
+.mo-viz-e { font-size: 18px; line-height: 1; }
+.mo-viz-n { font-size: 11px; color: var(--muted); }
+.mo-viz-bar { height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.mo-viz-bar i {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-soft), #7aa6c2);
+  transition: width .4s ease;
+}
+.mo-viz-c { font-size: 11px; color: var(--muted); text-align: right; }
+.mo-viz-total { font-size: 11px; margin: 2px 0 0; text-align: right; }
+
+/* 某天详情弹层 */
+.mo-mask {
+  position: fixed; inset: 0; z-index: 50; background: rgba(20, 30, 22, .35);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.mo-day-sheet {
+  width: 100%; max-width: 360px; background: var(--surface);
+  border-radius: var(--radius); padding: 18px; box-shadow: 0 12px 36px rgba(20,30,22,.25);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.mo-day-date { font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.mo-day-emojis { display: flex; flex-wrap: wrap; gap: 8px; font-size: 26px; line-height: 1; }
+.mo-day-note { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); }
+.mo-day-btns { display: flex; gap: 10px; }
+.mo-day-btns .btn { flex: 1; }
+
+/* ============================================================
+   记账总结（周/月/平均）
+   ============================================================ */
+.lg-sum {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+.lg-sum-avgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.lg-sum-avg {
+  background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+}
+.lg-sum-avg b { font-size: 15px; color: var(--text-strong); word-break: break-all; text-align: center; }
+.lg-sum-avg span { font-size: 11px; color: var(--muted); }
+.lg-sum-sub { font-size: 12px; color: var(--muted); }
+.lg-sum-table { display: flex; flex-direction: column; gap: 4px; }
+.lg-sum-row {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+  padding: 7px 10px; border-radius: 8px; background: var(--surface-2); font-size: 13px;
+}
+.lg-sum-row.head { background: transparent; font-size: 11px; color: var(--muted); padding: 2px 10px; }
+.lg-sum-name { color: var(--text-strong); font-weight: 600; }
+.lg-sum-exp { color: #c0563f; font-variant-numeric: tabular-nums; }
+.lg-sum-inc { color: var(--accent-deep); font-variant-numeric: tabular-nums; }
+[data-theme="dark"] .lg-sum-inc { color: var(--accent-soft); }
+
+/* 榜单分组标题 */
+.nn-rank-list-name {
+  font-size: 14px; font-weight: 800; color: var(--text-strong);
+  margin-top: 6px; padding-left: 2px;
+}

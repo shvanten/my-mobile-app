@@ -1,4 +1,4 @@
-const CACHE = 'myapp-v32';
+const CACHE = 'myapp-v33';
 const ASSETS = [
   './',
   './index.html',
@@ -30,6 +30,17 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // 榜单数据每日更新：网络优先，失败再回退缓存
+  if (e.request.url.indexOf('/data/rank.json') !== -1) {
+    e.respondWith(
+      fetch(e.request).then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy));
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then((cached) =>
       cached ||
