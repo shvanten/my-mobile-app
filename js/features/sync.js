@@ -48,6 +48,7 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
         mood:       { ts: Date.now(), data: read('mood.v1') },
         ledger:     { ts: Date.now(), data: read('ledger.v1') },
         novelnotes: { ts: Date.now(), data: read('novelnotes.v1') },
+        sticky:     { ts: Date.now(), data: read('sticky.v1') },
         checkin: {
           ts: Date.now(),
           habits:   read('checkin.habits.v1'),
@@ -62,7 +63,7 @@ const SYNC_GIST_DESC = 'My Mobile App sync data';   // 跨设备复用的标记
   function mergeStores(base, local) {
     const out = JSON.parse(JSON.stringify(local));
     // 通用：本地没有但云端有 → 用云端（防止空设备覆盖掉云端数据）
-    ['mood', 'ledger', 'novelnotes'].forEach((k) => {
+    ['mood', 'ledger', 'novelnotes', 'sticky'].forEach((k) => {
       const bHas = base[k] && base[k].data != null;
       const lHas = out[k] && out[k].data != null;
       if (bHas && !lHas) out[k] = JSON.parse(JSON.stringify(base[k]));
@@ -212,6 +213,7 @@ App.registerFeature({
           mood:       { ts: Date.now(), data: read('mood.v1') },
           ledger:     { ts: Date.now(), data: read('ledger.v1') },
           novelnotes: { ts: Date.now(), data: read('novelnotes.v1') },
+          sticky:     { ts: Date.now(), data: read('sticky.v1') },
           checkin: {
             ts: Date.now(),
             habits:   read('checkin.habits.v1'),
@@ -224,7 +226,7 @@ App.registerFeature({
     // 合并云端 base 与本地 local
     function mergeStores(base, local) {
       const out = JSON.parse(JSON.stringify(local));
-      ['mood', 'ledger', 'novelnotes'].forEach((k) => {
+      ['mood', 'ledger', 'novelnotes', 'sticky'].forEach((k) => {
         const bHas = base[k] && base[k].data != null;
         const lHas = out[k] && out[k].data != null;
         if (bHas && !lHas) out[k] = JSON.parse(JSON.stringify(base[k]));
@@ -252,6 +254,7 @@ App.registerFeature({
       if (s.mood       != null) { write('mood.v1',              s.mood.data   != null ? s.mood.data   : s.mood); n++; }
       if (s.ledger     != null) { write('ledger.v1',            s.ledger.data != null ? s.ledger.data : s.ledger); n++; }
       if (s.novelnotes != null) { write('novelnotes.v1',        s.novelnotes.data != null ? s.novelnotes.data : s.novelnotes); n++; }
+      if (s.sticky    != null) { write('sticky.v1',           s.sticky.data    != null ? s.sticky.data    : s.sticky);    n++; }
       if (s.checkin) {
         if (s.checkin.habits   != null) { write('checkin.habits.v1',   s.checkin.habits);   n++; }
         if (s.checkin.records  != null) { write('checkin.records.v1',  s.checkin.records);  n++; }

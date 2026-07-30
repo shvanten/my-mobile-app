@@ -2,8 +2,7 @@
  * 小说拆文：
  * - 自己创建「书」(长篇 / 短篇)
  * - 每本书 7 个 tab：标题分析 / 导语分析 / 核心梗分析 / 人设分析 / 付费节点分析 / 摘抄 / 其他分析
- * - 导航栏简称：标题 / 导语 / 核心梗 / 人设 / 付费节点 / 摘抄 / 其他
- * - 每条 item 支持「文字」或「手写图片」(text+img 至少一个)
+ * - 每条 item 支持「文字」+「多页手写」(向量笔触：多色笔 / 荧光笔 / 橡皮擦 / 套索选择 / 撤回还原)
  * - 编辑/添加弹层沾满一页，全屏可写
  * - 顶部 tab：📚 我的书 / 📑 全部摘抄 / 💡 全部分析 / 📈 榜单
  */
@@ -26,6 +25,7 @@ App.registerFeature({
       { key: 'quotes',   short: '摘抄',     full: '摘抄',         field: 'quotes' },
       { key: 'other',    short: '其他',     full: '其他分析',     field: 'otherAnalysis' },
     ];
+    const FIELDS = TABS.map((t) => t.field);
     const fieldOf = (k) => (TABS.find((t) => t.key === k) || {}).field;
     const labelOf = (k) => (TABS.find((t) => t.key === k) || {}).full || k;
     const fullList = TABS.map((t) => t.full).join('/');
@@ -33,29 +33,48 @@ App.registerFeature({
     // ---------- 存储 ----------
     // book = { id, title, type, emoji,
     //   titleAnalysis, taglineAnalysis, hookAnalysis, charsAnalysis,
-    //   payNodeAnalysis, otherAnalysis, quotes: [ {id,text,img,createdAt} ],
+    //   payNodeAnalysis, otherAnalysis, quotes: [ {id,text,drawings:[{id,strokes,thumb,img}],createdAt} ],
     //   createdAt }
     function ensureArrays(b) {
-      TABS.forEach((t) => { b[t.field] = Array.isArray(b[t.field]) ? b[t.field] : []; });
+      FIELDS.forEach((f) => { b[f] = Array.isArray(b[f]) ? b[f] : []; });
       b.type = (b.type === 'long' || b.type === 'short') ? b.type : 'short';
       b.emoji = b.emoji || '📕';
+    }
+    // 单条 item：旧 {text,img} -> {text,drawings}
+    function migrateItem(it) {
+      if (!it || typeof it !== 'object') return { id: 'i' + Math.random().toString(36).slice(2, 8), text: '', drawings: [], createdAt: Date.now() };
+      if ('img' in it && !('drawings' in it)) {
+        it.drawings = it.img ? [{ id: 'd' + Math.random().toString(36).slice(2, 8), strokes: [], img: it.img, thumb: it.img }] : [];
+        delete it.img;
+      }
+      if (!Array.isArray(it.drawings)) it.drawings = [];
+      if (!it.text) it.text = '';
+      if (!it.id) it.id = 'i' + Math.random().toString(36).slice(2, 8);
+      if (!it.createdAt) it.createdAt = Date.now();
+      it.drawings.forEach((d) => {
+        if (!Array.isArray(d.strokes)) d.strokes = [];
+        if (!d.id) d.id = 'd' + Math.random().toString(36).slice(2, 8);
+        d.strokes.forEach((s) => { if (!s.tool) s.tool = 'pen'; if (!s.color) s.color = '#274027'; if (!s.width) s.width = 3; });
+      });
+      return it;
     }
     function migrate(old) {
       if (!old || typeof old !== 'object') return { books: [] };
       if (Array.isArray(old.books)) {
         old.books.forEach((b) => {
-          // 旧结构迁移：tagline/hook/chars 字符串 -> 各自一条 entry
           const wrap = (s) => s && String(s).trim()
-            ? [{ id: 'm' + Math.random().toString(36).slice(2, 8), text: String(s), img: '', createdAt: Date.now() }]
+            ? [{ id: 'm' + Math.random().toString(36).slice(2, 8), text: String(s), drawings: [], createdAt: Date.now() }]
             : [];
           b.titleAnalysis   = b.titleAnalysis   || [];
           b.taglineAnalysis = b.taglineAnalysis || wrap(b.tagline);
           b.hookAnalysis    = b.hookAnalysis    || wrap(b.hook);
           b.charsAnalysis   = b.charsAnalysis   || wrap(b.chars);
           b.payNodeAnalysis = b.payNodeAnalysis || [];
-          b.otherAnalysis   = b.otherAnalysis   || (Array.isArray(b.analyses) ? b.analyses : []);
+          b.otherAnalysis   = b.otherAnalysis   || (Array.isArray(b.analyses)
+            ? b.analyses.map((a) => ({ id: a.id || ('m' + Math.random().toString(36).slice(2, 8)), text: a.text || '', drawings: [], createdAt: a.createdAt || Date.now() }))
+            : []);
           b.quotes          = Array.isArray(b.quotes) ? b.quotes : [];
-          // 清掉旧字段
+          FIELDS.forEach((f) => { b[f] = (b[f] || []).map(migrateItem); });
           delete b.tagline; delete b.hook; delete b.chars; delete b.analyses;
           ensureArrays(b);
         });
@@ -71,7 +90,7 @@ App.registerFeature({
         const name = String(c.name || '').replace(/^[《]/, '').replace(/[》]$/, '');
         const qs = (byCat[c.id] || []).map((n) => ({
           id: n.id || ('q' + Math.random().toString(36).slice(2, 8)),
-          text: n.text || '', img: '', createdAt: n.createdAt || now,
+          text: n.text || '', drawings: [], createdAt: n.createdAt || now,
         }));
         const empty = { titleAnalysis: [], taglineAnalysis: [], hookAnalysis: [], charsAnalysis: [], payNodeAnalysis: [], otherAnalysis: [] };
         return Object.assign({
@@ -86,7 +105,7 @@ App.registerFeature({
         books.push(Object.assign({
           id: 'b' + Math.random().toString(36).slice(2, 10),
           title: '随手记录', type: 'short', emoji: '📓',
-          quotes: orphans.map((n) => ({ id: n.id || ('q' + Math.random().toString(36).slice(2, 8)), text: n.text || '', img: '', createdAt: n.createdAt || now })),
+          quotes: orphans.map((n) => ({ id: n.id || ('q' + Math.random().toString(36).slice(2, 8)), text: n.text || '', drawings: [], createdAt: n.createdAt || now })),
           createdAt: now,
         }, empty));
       }
@@ -101,6 +120,9 @@ App.registerFeature({
 
     const uid = (p) => (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     function getBook(id) { return data.books.find((b) => b.id === id); }
+
+    // ---------- 手写笔色 ----------
+    const PEN_COLORS = ['#274027', '#1f3a8a', '#b82929', '#c47a16', '#2f7d32', '#8a2b8a', '#222222', '#0d6b6b'];
 
     // ---------- 状态 ----------
     let view = 'books';           // books | detail | rank | allQuotes | allAnalyses
@@ -187,11 +209,10 @@ App.registerFeature({
       const tint = b.type === 'long' ? 'long' : 'short';
       const total = TABS.reduce((s, t) => s + (b[t.field] || []).length, 0);
 
-      // 7 个 tab 页面
       const pages = TABS.map((t, i) => {
         const arr = b[t.field] || [];
         const list = arr.length
-          ? arr.map((it) => itemRow(t.key, it)).join('')
+          ? arr.map((it) => itemRow(t.key, it, b.id)).join('')
           : '<p class="muted nn-empty-inline">还没有内容，点「＋ 添加」开始记录。</p>';
         return '<div class="nn-pp" data-pp="' + t.key + '">' +
                '  <div class="nn-pp-section-head">' +
@@ -223,7 +244,6 @@ App.registerFeature({
         '  <div class="nn-page-pager" id="nn-page-pager">' + dots + '</div>' +
         '</div>';
 
-      // 顶部小卡片：第 1 个 tab（标题）显示书名/类型/总数，所以覆盖 title page 内容
       const titlePage = bodyEl.querySelector('.nn-pp[data-pp="title"]');
       if (titlePage) {
         titlePage.innerHTML =
@@ -237,13 +257,12 @@ App.registerFeature({
           '  </div>' +
           '  <div class="nn-section-list">' +
           ((b.titleAnalysis || []).length
-            ? b.titleAnalysis.map((it) => itemRow('title', it)).join('')
+            ? b.titleAnalysis.map((it) => itemRow('title', it, b.id)).join('')
             : '<p class="muted nn-empty-inline">还没有标题分析，点「＋ 添加」开始。</p>') +
           '  </div>' +
           '</div>';
       }
 
-      // 返回
       bodyEl.querySelector('#nn-back').addEventListener('click', () => {
         view = 'books'; currentBookId = null;
         fabEl.style.display = ''; titleEl.textContent = '小说拆文';
@@ -251,9 +270,7 @@ App.registerFeature({
         tabsEl.querySelectorAll('[data-view]').forEach((t) => { if (t.dataset.view !== 'books') t.classList.remove('on'); });
         paint();
       });
-      // 编辑书
       bodyEl.querySelector('#nn-edit-book').addEventListener('click', () => openBookEditor(b));
-      // 删除书
       bodyEl.querySelector('#nn-del-book').addEventListener('click', () => {
         const sum = TABS.map((t) => (b[t.field] || []).length + ' ' + t.short).join(' · ');
         App.confirm('删除这本书', '《' + b.title + '》\n' + sum + '\n\n删除后无法恢复，继续？', () => {
@@ -269,7 +286,6 @@ App.registerFeature({
         });
       });
 
-      // 横滑同步
       const pagesEl = bodyEl.querySelector('#nn-pages');
       const tabBtns = bodyEl.querySelectorAll('.nn-page-tab');
       const pagerDots = bodyEl.querySelectorAll('.nn-page-pager-dot');
@@ -285,22 +301,18 @@ App.registerFeature({
       tabBtns.forEach((bb, i) => bb.addEventListener('click', () => goTo(i)));
       pagerDots.forEach((d) => d.addEventListener('click', () => goTo(+d.dataset.go)));
 
-      // 添加
       bodyEl.querySelectorAll('[data-add]').forEach((btn) => {
         btn.addEventListener('click', () => openItemEditor(b, btn.dataset.add, null, paintDetail));
       });
-      // 编辑
       bodyEl.querySelectorAll('[data-iedit]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           const [k, iid] = btn.dataset.iedit.split('|');
           const field = fieldOf(k);
-          const arr = b[field] || [];
-          const it = arr.find((x) => x.id === iid);
+          const it = (b[field] || []).find((x) => x.id === iid);
           if (it) openItemEditor(b, k, it, paintDetail);
         });
       });
-      // 删除
       bodyEl.querySelectorAll('[data-idel]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -314,28 +326,22 @@ App.registerFeature({
           });
         });
       });
-      // 查看大图
-      bodyEl.querySelectorAll('[data-viewimg]').forEach((img) => {
-        img.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openImageViewer(img.dataset.viewimg);
-        });
-      });
+      bindViewers();
     }
 
-    // 单条 item 渲染：支持 文字 / 手写图 / 两者
-    function itemRow(key, it) {
+    // 单条 item 渲染：支持 文字 / 多页手写 / 两者
+    function itemRow(key, it, bookId) {
       const textHtml = it.text
         ? '<div class="nn-item-text">' + App.escapeHtml(it.text) + '</div>' : '';
-      const imgHtml = it.img
-        ? '<div class="nn-item-img-wrap"><img class="nn-item-img" data-viewimg="' + it.img + '" src="' + it.img + '" alt="手写" /></div>' : '';
-      const tag = (it.text && it.img) ? '图文' : (it.img ? '手写' : '文字');
+      const drawHtml = drawThumbsHtml(it, key, bookId);
+      const hasText = !!it.text, hasDraw = (it.drawings || []).length > 0;
+      const tag = (hasText && hasDraw) ? '图文' : (hasDraw ? '手写' : '文字');
       return '<div class="nn-item">' +
               '  <div class="nn-item-meta">' +
               '    <span class="nn-item-tag">' + tag + '</span>' +
               '    <span class="muted">' + fmtDate(it.createdAt) + '</span>' +
               '  </div>' +
-                imgHtml + textHtml +
+                drawHtml + textHtml +
               '  <div class="nn-item-ops">' +
               '    <button class="nn-op" data-iedit="' + key + '|' + it.id + '" type="button" aria-label="编辑">✏️</button>' +
               '    <button class="nn-op" data-idel="' + key + '|' + it.id + '" type="button" aria-label="删除">✕</button>' +
@@ -343,43 +349,141 @@ App.registerFeature({
               '</div>';
     }
 
-    // ---------- 大图查看 ----------
-    function openImageViewer(src) {
+    // 手写缩略图区
+    function drawThumbsHtml(it, key, bookId) {
+      const draws = it.drawings || [];
+      if (!draws.length) return '';
+      return '<div class="nn-item-draws">' + draws.map((d, i) => {
+        const src = d.thumb || d.img || '';
+        return '<div class="nn-draw-thumb" data-vd="' + key + '|' + bookId + '|' + it.id + '|' + i + '">' +
+          (src ? '<img src="' + src + '" alt="手写" />' : '<div class="nn-draw-empty">✍️</div>') +
+          '</div>';
+      }).join('') + '</div>';
+    }
+
+    // 绑定所有「查看手写大图」
+    function bindViewers() {
+      bodyEl.querySelectorAll('[data-vd]').forEach((el) => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const [k, bid, iid, idx] = el.dataset.vd.split('|');
+          openDrawingViewer(k, bid, iid, +idx);
+        });
+      });
+    }
+
+    // ---------- 手写大图查看（向量渲染） ----------
+    function openDrawingViewer(key, bookId, itemId, idx) {
+      const b = getBook(bookId); if (!b) return;
+      const field = fieldOf(key);
+      const it = (b[field] || []).find((x) => x.id === itemId); if (!it) return;
+      const d = (it.drawings || [])[idx]; if (!d) return;
       const wrap = document.createElement('div');
       wrap.className = 'nn-mask';
       wrap.innerHTML =
         '<div class="nn-img-viewer">' +
         '  <button class="nn-img-close" type="button">✕</button>' +
-        '  <img src="' + src + '" alt="查看大图" />' +
+        '  <div class="nn-viewer-canvas-wrap"><canvas id="nn-viewer-canvas"></canvas></div>' +
         '</div>';
       document.body.appendChild(wrap);
-      function close() { wrap.remove(); }
+      const cv = wrap.querySelector('#nn-viewer-canvas');
+      function size() {
+        const r = wrap.querySelector('.nn-viewer-canvas-wrap').getBoundingClientRect();
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        cv.width = Math.max(1, Math.floor(r.width * dpr));
+        cv.height = Math.max(1, Math.floor(r.height * dpr));
+        cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
+        const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+        renderStrokesTo(c, r.width, r.height, d, () => {});
+      }
+      setTimeout(size, 30);
+      window.addEventListener('resize', size);
+      function close() { window.removeEventListener('resize', size); wrap.remove(); }
       wrap.addEventListener('click', (e) => { if (e.target === wrap || e.target.matches('.nn-img-close')) close(); });
     }
 
-    // ---------- 添加/编辑：全屏弹层，文字 + 手写切换 ----------
+    // 把一个 drawing（strokes/img）渲染到任意 2d 上下文（逻辑尺寸 W,H）
+    const imgCache = {};
+    function getImg(src, cb) {
+      if (imgCache[src]) { if (imgCache[src].complete) cb(imgCache[src]); return; }
+      const im = new Image();
+      im.onload = () => { imgCache[src] = im; cb(im); };
+      im.src = src;
+    }
+    function renderStrokesTo(ctx, W, H, d, onImg) {
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = '#fdfbf5'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#e8e2d0'; ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+      for (let y = 0; y < H; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+      function drawStrokes() {
+        (d.strokes || []).forEach((s) => {
+          if (!s.pts || s.pts.length === 0) return;
+          ctx.beginPath();
+          ctx.strokeStyle = s.color || '#274027';
+          ctx.lineWidth = s.width || 3;
+          ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+          ctx.globalAlpha = s.tool === 'marker' ? 0.42 : 1;
+          ctx.moveTo(s.pts[0][0], s.pts[0][1]);
+          for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i][0], s.pts[i][1]);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        });
+      }
+      if (d.img) {
+        getImg(d.img, (im) => {
+          const ratio = Math.min(W / im.width, H / im.height);
+          const w = im.width * ratio, h = im.height * ratio;
+          ctx.drawImage(im, (W - w) / 2, (H - h) / 2, w, h);
+          drawStrokes();
+          if (onImg) onImg();
+        });
+      } else {
+        drawStrokes();
+      }
+    }
+
+    // ---------- 添加/编辑：文字 + 多页手写（向量笔触） ----------
+    function clonePages(arr) {
+      return (arr || []).map((p) => ({
+        id: p.id || uid('d'),
+        strokes: (p.strokes || []).map((s) => ({
+          pts: (s.pts || []).map((pt) => [pt[0], pt[1]]),
+          color: s.color || '#274027',
+          width: s.width || 3,
+          tool: s.tool || 'pen',
+        })),
+        thumb: p.thumb || '',
+        img: p.img || '',
+        undo: [], redo: [],
+      }));
+    }
+
     function openItemEditor(book, key, existing, onDone) {
       const isNew = !existing;
       const field = fieldOf(key);
       const tab = TABS.find((t) => t.key === key) || {};
       const fullName = tab.full || key;
       const hint = key === 'quotes' ? '抄录精彩的句子、好词好句……' : '拆解这一维度的写作要点、技巧、节奏……';
-      openFullEditor({
+
+      let pages = clonePages(existing ? existing.drawings : []);
+      if (!pages.length) pages.push({ id: uid('d'), strokes: [], thumb: '', img: '', undo: [], redo: [] });
+      let curText = existing ? (existing.text || '') : '';
+      let mode = curText || pages[0].strokes.length ? (curText ? 'text' : 'draw') : 'text';
+
+      openDrawEditor({
         title: (isNew ? '添加' : '编辑') + '·' + fullName,
-        text: existing ? existing.text : '',
-        img: existing ? existing.img : '',
         hint: hint,
-        onSave: (text, img) => {
+        text: curText,
+        pages: pages,
+        onSave: (text, finalPages) => {
           const t = (text || '').trim();
-          if (!t && !img) { App.toast('文字和手写不能都为空'); return; }
+          const kept = finalPages.filter((p) => (p.strokes && p.strokes.length) || p.img);
+          if (!t && !kept.length) { App.toast('文字和手写不能都为空'); return; }
           if (isNew) {
-            (book[field] = book[field] || []).push({
-              id: uid(key),
-              text: t, img: img || '',
-              createdAt: Date.now(),
-            });
+            (book[field] = book[field] || []).push({ id: uid(key), text: t, drawings: kept, createdAt: Date.now() });
           } else {
-            existing.text = t; existing.img = img || '';
+            existing.text = t; existing.drawings = kept;
           }
           save();
           (onDone || paintDetail)();
@@ -388,13 +492,10 @@ App.registerFeature({
       });
     }
 
-    // ---------- 全屏编辑器：文字 + 手写两 tab ----------
-    function openFullEditor({ title, text, img, hint, onSave }) {
+    // ---------- 全屏手写编辑器（多色 / 荧光 / 橡皮 / 套索 / 撤回还原 / 多页） ----------
+    function openDrawEditor({ title, hint, text, pages, onSave }) {
       const wrap = document.createElement('div');
       wrap.className = 'nn-mask';
-      let curText = text || '';
-      let curImg = img || '';
-      let mode = text || !img ? 'text' : 'draw';   // 默认文字优先
       wrap.innerHTML =
         '<div class="nn-sheet nn-sheet-full">' +
         '  <div class="nn-sheet-bar">' +
@@ -406,35 +507,81 @@ App.registerFeature({
         '    <button class="nn-edit-tab on" data-mode="text" type="button">⌨️ 文字</button>' +
         '    <button class="nn-edit-tab" data-mode="draw" type="button">✍️ 手写</button>' +
         '  </div>' +
-        '  <div class="nn-edit-area" id="fe-area">' +
-        // 文字区
+        '  <div class="nn-edit-area">' +
         '    <div class="nn-edit-pane nn-edit-text" data-pane="text">' +
         (hint ? '<p class="muted nn-edit-hint">' + App.escapeHtml(hint) + '</p>' : '') +
         '      <textarea id="fe-text" placeholder="可留空"></textarea>' +
         '    </div>' +
-        // 手写区
         '    <div class="nn-edit-pane nn-edit-draw" data-pane="draw" hidden>' +
-        '      <div class="nn-draw-bar">' +
-        '        <label class="muted">笔触</label>' +
-        '        <input type="range" id="fe-pen" min="1" max="10" step="1" value="3" />' +
-        '        <span id="fe-pen-v" class="muted">3</span>' +
-        '        <button class="btn ghost sm" id="fe-undo" type="button">↶ 撤销</button>' +
-        '        <button class="btn ghost sm" id="fe-clear" type="button">🗑 清空</button>' +
+        '      <div class="hw">' +
+        '        <div class="hw-row hw-tools">' +
+        '          <button class="hw-tool on" data-tool="pen" type="button">🖊 笔</button>' +
+        '          <button class="hw-tool" data-tool="marker" type="button">🖍 荧光</button>' +
+        '          <button class="hw-tool" data-tool="eraser" type="button">🧽 橡皮</button>' +
+        '          <button class="hw-tool" data-tool="lasso" type="button">⭕ 套索</button>' +
+        '          <button class="hw-tool" id="hw-undo" type="button">↶ 撤回</button>' +
+        '          <button class="hw-tool" id="hw-redo" type="button">↷ 还原</button>' +
+        '        </div>' +
+        '        <div class="hw-row hw-colors" id="hw-colors"></div>' +
+        '        <div class="hw-row hw-opt">' +
+        '          <label class="muted">粗细</label>' +
+        '          <input type="range" id="hw-width" min="1" max="14" value="3" />' +
+        '          <span id="hw-width-v" class="muted">3</span>' +
+        '          <button class="hw-tool ghost" id="hw-clear" type="button">🗑 清空本页</button>' +
+        '          <button class="hw-tool danger" id="hw-del-sel" type="button" hidden>🗑 删除选中</button>' +
+        '          <span id="hw-tip" class="muted"></span>' +
+        '        </div>' +
+        '        <div class="nn-draw-wrap"><canvas id="fe-canvas"></canvas></div>' +
+        '        <div class="hw-pages" id="hw-pages"></div>' +
         '      </div>' +
-        '      <div class="nn-draw-wrap"><canvas id="fe-canvas"></canvas></div>' +
         '    </div>' +
         '  </div>' +
         '</div>';
       document.body.appendChild(wrap);
+
       const ta = wrap.querySelector('#fe-text');
-      ta.value = curText;
+      ta.value = text || '';
       const canvas = wrap.querySelector('#fe-canvas');
       const ctx = canvas.getContext('2d');
-      let drawing = false, lastX = 0, lastY = 0;
-      let penW = 3, strokes = [], curStroke = null;
+      const colorsEl = wrap.querySelector('#hw-colors');
+      const widthEl = wrap.querySelector('#hw-width');
+      const widthV = wrap.querySelector('#hw-width-v');
+      const tipEl = wrap.querySelector('#hw-tip');
+      const delSelBtn = wrap.querySelector('#hw-del-sel');
 
+      let tool = 'pen';
+      let curColor = PEN_COLORS[0];
+      let curWidth = 3;
+      let pageIndex = 0;
+      let selected = new Set();
+      let lassoPts = [];
+
+      // 颜色色板
+      colorsEl.innerHTML = PEN_COLORS.map((c, i) =>
+        '<button class="hw-color' + (i === 0 ? ' on' : '') + '" data-c="' + c + '" type="button" style="background:' + c + '"></button>'
+      ).join('');
+      colorsEl.querySelectorAll('.hw-color').forEach((b) => {
+        b.addEventListener('click', () => {
+          curColor = b.dataset.c;
+          colorsEl.querySelectorAll('.hw-color').forEach((x) => x.classList.toggle('on', x === b));
+        });
+      });
+
+      function page() { return pages[pageIndex]; }
+      function snapshot() {
+        return page().strokes.map((s) => ({ pts: s.pts.map((p) => [p[0], p[1]]), color: s.color, width: s.width, tool: s.tool }));
+      }
+      function commit(prev) { page().undo.push(prev); page().redo = []; updateUndoRedo(); }
+      function applyStrokes(arr) { page().strokes = arr; selected.clear(); hideDelSel(); redraw(); updateUndoRedo(); }
+      function updateUndoRedo() {
+        wrap.querySelector('#hw-undo').disabled = page().undo.length === 0;
+        wrap.querySelector('#hw-redo').disabled = page().redo.length === 0;
+      }
+      function showDelSel() { delSelBtn.hidden = selected.size === 0; tipEl.textContent = selected.size ? ('已选 ' + selected.size + ' 笔 · 拖动可移动') : ''; }
+      function hideDelSel() { delSelBtn.hidden = true; tipEl.textContent = ''; }
+
+      // ---------- 画布尺寸 ----------
       function resizeCanvas() {
-        // 设置 canvas 尺寸为容器尺寸 * devicePixelRatio
         const r = wrap.querySelector('.nn-draw-wrap').getBoundingClientRect();
         const dpr = Math.max(1, window.devicePixelRatio || 1);
         canvas.width = Math.max(1, Math.floor(r.width * dpr));
@@ -442,63 +589,186 @@ App.registerFeature({
         canvas.style.width = r.width + 'px';
         canvas.style.height = r.height + 'px';
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = '#274027';
-        // 重放历史
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         redraw();
       }
 
-      function redraw() {
+      function drawBgGrid() {
         const r = wrap.querySelector('.nn-draw-wrap').getBoundingClientRect();
         ctx.clearRect(0, 0, r.width, r.height);
-        // 浅米色背景便于看
-        ctx.fillStyle = '#fdfbf5';
-        ctx.fillRect(0, 0, r.width, r.height);
-        // 网格
-        ctx.strokeStyle = '#e8e2d0';
-        ctx.lineWidth = 1;
+        ctx.fillStyle = '#fdfbf5'; ctx.fillRect(0, 0, r.width, r.height);
+        ctx.strokeStyle = '#e8e2d0'; ctx.lineWidth = 1;
         for (let x = 0; x < r.width; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, r.height); ctx.stroke(); }
         for (let y = 0; y < r.height; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(r.width, y); ctx.stroke(); }
-        // 笔触
-        const all = strokes.concat(curStroke ? [curStroke] : []);
-        all.forEach((s) => {
-          if (!s.pts || s.pts.length < 1) return;
+      }
+      function drawImgFit(im) {
+        const r = wrap.querySelector('.nn-draw-wrap').getBoundingClientRect();
+        const ratio = Math.min(r.width / im.width, r.height / im.height);
+        const w = im.width * ratio, h = im.height * ratio;
+        ctx.drawImage(im, (r.width - w) / 2, (r.height - h) / 2, w, h);
+      }
+      function drawStrokes() {
+        (page().strokes || []).forEach((s, idx) => {
+          if (!s.pts || s.pts.length === 0) return;
           ctx.beginPath();
-          ctx.strokeStyle = '#274027';
-          ctx.lineWidth = s.w;
-          ctx.moveTo(s.pts[0].x, s.pts[0].y);
-          for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i].x, s.pts[i].y);
+          ctx.strokeStyle = s.color || '#274027';
+          ctx.lineWidth = s.width || 3;
+          ctx.globalAlpha = s.tool === 'marker' ? 0.42 : 1;
+          ctx.moveTo(s.pts[0][0], s.pts[0][1]);
+          for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i][0], s.pts[i][1]);
           ctx.stroke();
+          ctx.globalAlpha = 1;
+          if (selected.has(idx)) {
+            const bb = bbox(s);
+            ctx.save();
+            ctx.strokeStyle = '#e0533a'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+            ctx.strokeRect(bb.x - 4, bb.y - 4, bb.w + 8, bb.h + 8);
+            ctx.restore();
+          }
         });
       }
+      function drawLasso() {
+        if (lassoPts.length < 2) return;
+        ctx.save();
+        ctx.strokeStyle = '#6a7ec4'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(lassoPts[0][0], lassoPts[0][1]);
+        for (let i = 1; i < lassoPts.length; i++) ctx.lineTo(lassoPts[i][0], lassoPts[i][1]);
+        ctx.closePath(); ctx.stroke();
+        ctx.restore();
+      }
+      function redraw() {
+        drawBgGrid();
+        const p = page();
+        if (p.img) {
+          getImg(p.img, (im) => { drawImgFit(im); drawStrokes(); drawLasso(); });
+        }
+        drawStrokes();
+        drawLasso();
+      }
+
+      // ---------- 几何工具 ----------
+      function bbox(s) {
+        let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+        s.pts.forEach((p) => { if (p[0] < minx) minx = p[0]; if (p[1] < miny) miny = p[1]; if (p[0] > maxx) maxx = p[0]; if (p[1] > maxy) maxy = p[1]; });
+        return { x: minx, y: miny, w: maxx - minx, h: maxy - miny };
+      }
+      function distToSeg(px, py, x1, y1, x2, y2) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const l2 = dx * dx + dy * dy;
+        if (l2 === 0) return Math.hypot(px - x1, py - y1);
+        let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+      }
+      function pointInPoly(x, y, poly) {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+          if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+        }
+        return inside;
+      }
+      function strokeInPoly(s, poly) { return s.pts.some((p) => pointInPoly(p[0], p[1], poly)); }
+      function pointInStrokeBBox(x, y, s, m) {
+        const b = bbox(s);
+        return x >= b.x - m && x <= b.x + b.w + m && y >= b.y - m && y <= b.y + b.h + m;
+      }
+
+      // ---------- 画笔事件 ----------
+      let drawing = false, lastX = 0, lastY = 0, curStroke = null, drawPrev = null;
+      let erasing = false, erasingChanged = false, erasePrev = null;
+      let lassoing = false;
+      let dragging = false, dragPrev = null, dragMoved = false, dragPrevSnap = null;
 
       function pos(e) {
         const r = canvas.getBoundingClientRect();
         const t = (e.touches && e.touches[0]) || e;
         return { x: t.clientX - r.left, y: t.clientY - r.top };
       }
+
       function start(e) {
         e.preventDefault();
-        drawing = true; const p = pos(e); lastX = p.x; lastY = p.y;
-        curStroke = { w: penW, pts: [{ x: p.x, y: p.y }] };
-        redraw();
+        const p = pos(e);
+        if (tool === 'pen' || tool === 'marker') {
+          drawing = true; lastX = p.x; lastY = p.y; drawPrev = snapshot();
+          const w = tool === 'marker' ? Math.max(8, curWidth * 3) : curWidth;
+          curStroke = { pts: [[p.x, p.y]], color: curColor, width: w, tool: tool };
+          redraw();
+        } else if (tool === 'eraser') {
+          erasing = true; erasingChanged = false; erasePrev = snapshot();
+          lastX = p.x; lastY = p.y;
+        } else if (tool === 'lasso') {
+          lassoing = true; lassoPts = [[p.x, p.y]];
+        } else if (tool === 'move') {
+          // 点中已选中的笔画 -> 拖动
+          let hit = -1;
+          page().strokes.forEach((s, i) => { if (selected.has(i) && pointInStrokeBBox(p.x, p.y, s, 6)) hit = i; });
+          if (hit >= 0) {
+            dragging = true; dragMoved = false; dragPrev = p; dragPrevSnap = snapshot();
+          } else {
+            // 点空白处 -> 取消选择
+            selected.clear(); hideDelSel(); redraw(); tool = 'pen'; setToolUI();
+          }
+        }
       }
       function move(e) {
-        if (!drawing) return; e.preventDefault();
+        if (!drawing && !erasing && !lassoing && !dragging) return;
+        e.preventDefault();
         const p = pos(e);
-        curStroke.pts.push({ x: p.x, y: p.y });
-        // 增量画
-        const r = wrap.querySelector('.nn-draw-wrap').getBoundingClientRect();
-        ctx.strokeStyle = '#274027'; ctx.lineWidth = curStroke.w;
-        ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
-        lastX = p.x; lastY = p.y;
+        if (drawing && curStroke) {
+          curStroke.pts.push([p.x, p.y]);
+          ctx.strokeStyle = curStroke.color; ctx.lineWidth = curStroke.width;
+          ctx.globalAlpha = curStroke.tool === 'marker' ? 0.42 : 1;
+          ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+          ctx.globalAlpha = 1;
+          lastX = p.x; lastY = p.y;
+        } else if (erasing) {
+          const er = Math.max(10, curWidth * 2 + 6);
+          let removed = false;
+          const strokes = page().strokes;
+          for (let i = strokes.length - 1; i >= 0; i--) {
+            if (strokes[i].pts.some((pt) => distToSeg(pt[0], pt[1], lastX, lastY, p.x, p.y) < er)) {
+              strokes.splice(i, 1); removed = true;
+            }
+          }
+          if (removed) { erasingChanged = true; redraw(); }
+          lastX = p.x; lastY = p.y;
+        } else if (lassoing) {
+          lassoPts.push([p.x, p.y]); redraw();
+        } else if (dragging) {
+          const dx = p.x - dragPrev.x, dy = p.y - dragPrev.y;
+          if (Math.abs(dx) > 0 || Math.abs(dy) > 0) dragMoved = true;
+          page().strokes.forEach((s, i) => { if (selected.has(i)) s.pts.forEach((pt) => { pt[0] += dx; pt[1] += dy; }); });
+          dragPrev = p; redraw();
+        }
       }
       function end(e) {
-        if (!drawing) return; e && e.preventDefault && e.preventDefault();
-        drawing = false;
-        if (curStroke) { strokes.push(curStroke); curStroke = null; }
+        if (drawing) {
+          drawing = false;
+          if (curStroke) {
+            // 抽稀 + 入栈
+            if (curStroke.pts.length > 1) { page().strokes.push(curStroke); commit(drawPrev); }
+            curStroke = null;
+            redraw();
+          }
+        } else if (erasing) {
+          erasing = false;
+          if (erasingChanged) commit(erasePrev);
+        } else if (lassoing) {
+          lassoing = false;
+          if (lassoPts.length >= 3) {
+            selected = new Set();
+            page().strokes.forEach((s, i) => { if (strokeInPoly(s, lassoPts)) selected.add(i); });
+            if (selected.size) { tool = 'move'; setToolUI(); }
+          }
+          lassoPts = []; redraw(); showDelSel();
+        } else if (dragging) {
+          dragging = false;
+          if (dragMoved) commit(dragPrevSnap);
+        }
       }
+
       canvas.addEventListener('mousedown', start);
       canvas.addEventListener('mousemove', move);
       window.addEventListener('mouseup', end);
@@ -507,32 +777,107 @@ App.registerFeature({
       canvas.addEventListener('touchend', end);
       canvas.addEventListener('touchcancel', end);
 
-      // 笔触 / 撤销 / 清空
-      const penEl = wrap.querySelector('#fe-pen');
-      const penV = wrap.querySelector('#fe-pen-v');
-      penEl.addEventListener('input', () => { penW = +penEl.value; penV.textContent = penW; });
-      wrap.querySelector('#fe-undo').addEventListener('click', () => { strokes.pop(); redraw(); });
-      wrap.querySelector('#fe-clear').addEventListener('click', () => {
-        App.confirm('清空手写', '清空当前画板上的所有笔触？', () => { strokes = []; curStroke = null; redraw(); });
+      // 粗细
+      widthEl.addEventListener('input', () => { curWidth = +widthEl.value; widthV.textContent = curWidth; });
+
+      // 工具切换
+      function setToolUI() {
+        wrap.querySelectorAll('.hw-tool[data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === tool));
+        if (tool !== 'move') hideDelSel(); else showDelSel();
+      }
+      wrap.querySelectorAll('.hw-tool[data-tool]').forEach((b) => {
+        b.addEventListener('click', () => {
+          tool = b.dataset.tool;
+          if (tool !== 'lasso') lassoPts = [];
+          if (tool !== 'move') { selected.clear(); }
+          setToolUI(); redraw();
+        });
       });
 
-      // 如果是编辑现有手写图，先把 img 画到画板
-      if (curImg) {
-        const tmp = new Image();
-        tmp.onload = () => {
-          setTimeout(resizeCanvas, 30);
-          const r = wrap.querySelector('.nn-draw-wrap').getBoundingClientRect();
-          // 简单等比缩放绘制
-          const ratio = Math.min(r.width / tmp.width, r.height / tmp.height);
-          const w = tmp.width * ratio, h = tmp.height * ratio;
-          ctx.drawImage(tmp, (r.width - w) / 2, (r.height - h) / 2, w, h);
-          // 这种情况下保存时直接导出当前 canvas 即可
-        };
-        tmp.src = curImg;
-      } else {
-        setTimeout(resizeCanvas, 30);
+      // 撤回 / 还原
+      wrap.querySelector('#hw-undo').addEventListener('click', () => {
+        const p = page();
+        if (!p.undo.length) return;
+        p.redo.push(snapshot());
+        applyStrokes(p.undo.pop());
+      });
+      wrap.querySelector('#hw-redo').addEventListener('click', () => {
+        const p = page();
+        if (!p.redo.length) return;
+        p.undo.push(snapshot());
+        applyStrokes(p.redo.pop());
+      });
+      // 清空本页
+      wrap.querySelector('#hw-clear').addEventListener('click', () => {
+        const p = page();
+        if (!p.strokes.length) return;
+        App.confirm('清空本页', '清空当前页所有笔触？', () => { commit(snapshot()); p.strokes = []; selected.clear(); hideDelSel(); redraw(); });
+      });
+      // 删除选中
+      delSelBtn.addEventListener('click', () => {
+        if (!selected.size) return;
+        const p = page();
+        App.confirm('删除选中', '删除选中的 ' + selected.size + ' 笔？', () => {
+          const prev = snapshot();
+          p.strokes = p.strokes.filter((_, i) => !selected.has(i));
+          selected.clear(); commit(prev); hideDelSel(); redraw();
+        });
+      });
+
+      // ---------- 多页 ----------
+      function makeThumb(p) {
+        const r = wrap.querySelector('.nn-draw-wrap').getBoundingClientRect();
+        if (r.width < 2) { p.thumb = p.img || ''; return; }
+        const off = document.createElement('canvas');
+        off.width = canvas.width; off.height = canvas.height;
+        const octx = off.getContext('2d');
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        renderStrokesTo(octx, r.width, r.height, p, () => {});
+        const tw = 120, th = Math.max(1, Math.round(tw * r.height / Math.max(1, r.width)));
+        const tc = document.createElement('canvas'); tc.width = tw; tc.height = th;
+        tc.getContext('2d').drawImage(off, 0, 0, tw, th);
+        p.thumb = tc.toDataURL('image/png');
       }
-      window.addEventListener('resize', resizeCanvas);
+      function renderPages() {
+        const el = wrap.querySelector('#hw-pages');
+        el.innerHTML = pages.map((p, i) =>
+          '<div class="hw-page' + (i === pageIndex ? ' on' : '') + '" data-pi="' + i + '">' +
+          (p.thumb ? '<img src="' + p.thumb + '" alt="页' + (i + 1) + '" />' : '<div class="hw-page-empty">✍️</div>') +
+          '<span class="hw-page-no">' + (i + 1) + '</span>' +
+          (pages.length > 1 ? '<button class="hw-page-del" data-del="' + i + '" type="button">✕</button>' : '') +
+          '</div>'
+        ).join('') +
+        '<button class="hw-page hw-page-add" id="hw-page-add" type="button">＋</button>';
+        el.querySelectorAll('.hw-page[data-pi]').forEach((b) => {
+          b.addEventListener('click', (e) => {
+            if (e.target.closest('.hw-page-del')) return;
+            switchPage(+b.dataset.pi);
+          });
+        });
+        el.querySelectorAll('.hw-page-del').forEach((b) => {
+          b.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const i = +b.dataset.del;
+            App.confirm('删除此页', '删除第 ' + (i + 1) + ' 页手写？', () => {
+              if (pages.length <= 1) { pages[0].strokes = []; pages[0].thumb = ''; }
+              else { pages.splice(i, 1); if (pageIndex >= pages.length) pageIndex = pages.length - 1; }
+              selected.clear(); hideDelSel(); redraw(); renderPages(); updateUndoRedo();
+            });
+          });
+        });
+        el.querySelector('#hw-page-add').addEventListener('click', () => {
+          pages.push({ id: uid('d'), strokes: [], thumb: '', img: '', undo: [], redo: [] });
+          pageIndex = pages.length - 1; selected.clear(); hideDelSel(); redraw(); renderPages(); updateUndoRedo();
+        });
+      }
+      function switchPage(i) {
+        if (i === pageIndex || i < 0 || i >= pages.length) return;
+        makeThumb(page());
+        pageIndex = i;
+        selected.clear(); hideDelSel();
+        redraw(); renderPages(); updateUndoRedo();
+      }
 
       // 模式切换
       const modeBtns = wrap.querySelectorAll('.nn-edit-tab');
@@ -546,7 +891,6 @@ App.registerFeature({
       }
       modeBtns.forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
 
-      // 关闭
       function close() {
         window.removeEventListener('mouseup', end);
         window.removeEventListener('resize', resizeCanvas);
@@ -556,28 +900,15 @@ App.registerFeature({
 
       // 保存
       wrap.querySelector('#fe-save').addEventListener('click', () => {
-        curText = ta.value;
-        // 如果当前在手写模式，导出 canvas 为 dataURL
-        if (mode === 'draw') {
-          const r = wrap.querySelector('.nn-draw-wrap').getBoundingClientRect();
-          // 如果画板为空（没有 strokes 且没原图），curImg 置空
-          if (strokes.length === 0 && !curImg) {
-            curImg = '';
-          } else {
-            // 临时画一个干净背景
-            const tmp = document.createElement('canvas');
-            tmp.width = canvas.width; tmp.height = canvas.height;
-            const tctx = tmp.getContext('2d');
-            tctx.drawImage(canvas, 0, 0);
-            curImg = tmp.toDataURL('image/png');
-          }
-        }
+        makeThumb(page());
+        if (mode === 'draw') makeThumb(page());
         close();
-        try { onSave(curText, curImg); } catch (e) { console.error(e); App.toast('保存失败'); }
+        try { onSave(ta.value, pages); } catch (e) { console.error(e); App.toast('保存失败'); }
       });
 
       setMode(mode);
-      setTimeout(() => { if (mode === 'text') ta.focus(); }, 60);
+      setTimeout(() => { if (mode === 'draw') resizeCanvas(); else ta.focus(); }, 60);
+      renderPages(); updateUndoRedo();
     }
 
     // ---------- 新建/编辑书（弹层） ----------
@@ -704,14 +1035,16 @@ App.registerFeature({
       const rows = all.length
         ? all.map(({ book, tab, item }) => {
             const textHtml = item.text ? '<div class="nn-item-text">' + App.escapeHtml(item.text) + '</div>' : '';
-            const imgHtml = item.img ? '<div class="nn-item-img-wrap"><img class="nn-item-img" data-viewimg="' + item.img + '" src="' + item.img + '" alt="手写" /></div>' : '';
-            return '<div class="nn-item nn-item-all" data-bid="' + book.id + '" data-iid="' + item.id + '">' +
+            const drawHtml = drawThumbsHtml(item, tab.key, book.id);
+            const hasText = !!item.text, hasDraw = (item.drawings || []).length > 0;
+            const tag = (hasText && hasDraw) ? '图文' : (hasDraw ? '手写' : '文字');
+            return '<div class="nn-item nn-item-all" data-bid="' + book.id + '">' +
                    '  <div class="nn-item-meta">' +
                    '    <span class="nn-item-tag">' + App.escapeHtml(tab.full) + '</span>' +
                    '    <span class="nn-item-from" data-goto="' + book.id + '">' + App.escapeHtml(book.title) + '</span>' +
                    '    <span class="muted">' + fmtDate(item.createdAt) + '</span>' +
                    '  </div>' +
-                     imgHtml + textHtml +
+                     drawHtml + textHtml +
                    '  <div class="nn-item-ops">' +
                    '    <button class="nn-op" data-iedit="' + tab.key + '|' + book.id + '|' + item.id + '" type="button" aria-label="编辑">✏️</button>' +
                    '    <button class="nn-op" data-idel="' + tab.key + '|' + book.id + '|' + item.id + '" type="button" aria-label="删除">✕</button>' +
@@ -730,8 +1063,7 @@ App.registerFeature({
       bodyEl.querySelectorAll('[data-goto]').forEach((el) => {
         el.addEventListener('click', (e) => {
           e.stopPropagation();
-          const bid = el.dataset.goto;
-          view = 'detail'; currentBookId = bid; paint();
+          view = 'detail'; currentBookId = el.dataset.goto; paint();
         });
       });
       bodyEl.querySelectorAll('[data-iedit]').forEach((btn) => {
@@ -759,9 +1091,7 @@ App.registerFeature({
           });
         });
       });
-      bodyEl.querySelectorAll('[data-viewimg]').forEach((img) => {
-        img.addEventListener('click', (e) => { e.stopPropagation(); openImageViewer(img.dataset.viewimg); });
-      });
+      bindViewers();
     }
 
     function fmtDate(t) {
