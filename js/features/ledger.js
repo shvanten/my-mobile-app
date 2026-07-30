@@ -60,24 +60,34 @@ App.registerFeature({
       return b;
     }
 
-    // ---------- 渲染骨架 ----------
+    // ---------- 渲染骨架（横滑双页） ----------
     container.innerHTML =
       '<div class="lg">' +
       '  <div class="lg-head">' +
       '    <h2>记账</h2>' +
       '    <button class="btn ghost lg-set" type="button" id="lg-set">💰 设置存款</button>' +
       '  </div>' +
-      '  <div class="lg-bal">' +
-      '    <span class="lg-bal-label">当前存款</span>' +
-      '    <span class="lg-bal-num" id="lg-bal-num">' + money(balance()) + '</span>' +
-      '    <span class="lg-bal-sub" id="lg-bal-sub"></span>' +
+      '  <div class="lg-pages" id="lg-pages">' +
+      '    <div class="lg-page" data-page="main">' +
+      '      <div class="lg-bal">' +
+      '        <span class="lg-bal-label">当前存款</span>' +
+      '        <span class="lg-bal-num" id="lg-bal-num">' + money(balance()) + '</span>' +
+      '        <span class="lg-bal-sub" id="lg-bal-sub"></span>' +
+      '      </div>' +
+      '      <div class="lg-cats-title">记一笔</div>' +
+      '      <div class="lg-cats" id="lg-cats"></div>' +
+      '      <div class="lg-rec-title">记录</div>' +
+      '      <div class="lg-rec" id="lg-rec"></div>' +
+      '    </div>' +
+      '    <div class="lg-page" data-page="summary">' +
+      '      <div class="lg-cats-title">消费总结</div>' +
+      '      <div class="lg-sum" id="lg-sum"></div>' +
+      '    </div>' +
       '  </div>' +
-      '  <div class="lg-cats-title">记一笔</div>' +
-      '  <div class="lg-cats" id="lg-cats"></div>' +
-      '  <div class="lg-cats-title">消费总结</div>' +
-      '  <div class="lg-sum" id="lg-sum"></div>' +
-      '  <div class="lg-rec-title">记录</div>' +
-      '  <div class="lg-rec" id="lg-rec"></div>' +
+      '  <div class="lg-pager" id="lg-pager">' +
+      '    <span class="lg-pager-dot on" data-go="main"></span>' +
+      '    <span class="lg-pager-dot" data-go="summary"></span>' +
+      '  </div>' +
       '  <div class="lg-sheet" id="lg-sheet" hidden>' +
       '    <div class="lg-sheet-backdrop"></div>' +
       '    <div class="lg-sheet-box">' +
@@ -95,6 +105,18 @@ App.registerFeature({
       '    </div>' +
       '  </div>' +
       '</div>';
+
+    const pagesEl = container.querySelector('#lg-pages');
+    const pagerEl = container.querySelector('#lg-pager');
+    // 横滑同步 dot
+    pagesEl.addEventListener('scroll', () => {
+      const i = Math.round(pagesEl.scrollLeft / pagesEl.clientWidth);
+      pagerEl.querySelectorAll('.lg-pager-dot').forEach((d, idx) => d.classList.toggle('on', idx === i));
+    });
+    pagerEl.querySelectorAll('.lg-pager-dot').forEach((d) => d.addEventListener('click', () => {
+      const i = d.dataset.go === 'summary' ? 1 : 0;
+      pagesEl.scrollTo({ left: i * pagesEl.clientWidth, behavior: 'smooth' });
+    }));
 
     const balNumEl = container.querySelector('#lg-bal-num');
     const balSubEl = container.querySelector('#lg-bal-sub');

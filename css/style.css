@@ -1529,3 +1529,180 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   border-radius: 8px; font-size: 18px; padding: 4px 0; cursor: pointer; line-height: 1;
 }
 .nn-type-icon.on { background: var(--accent); border-color: var(--accent); }
+
+/* 关键 bug 修复：display:flex 会覆盖 hidden 属性，导致 mask 永远关不掉 */
+.app-modal-mask[hidden],
+.nn-mask[hidden],
+.mo-mask[hidden],
+.lg-sheet[hidden] { display: none !important; }
+/* ============================================================
+   横滑双页（mood / ledger 共用）
+   ============================================================ */
+.mo-pages,
+.lg-pages {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.mo-pages::-webkit-scrollbar,
+.lg-pages::-webkit-scrollbar { display: none; }
+.mo-page,
+.lg-page {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  min-width: 100%;
+  box-sizing: border-box;
+  padding-bottom: 12px;
+}
+.mo-pager,
+.lg-pager {
+  display: flex; gap: 6px; justify-content: center;
+  padding: 8px 0 4px;
+}
+.mo-pager-dot,
+.lg-pager-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); cursor: pointer;
+  transition: width .25s ease, background .25s ease;
+}
+.mo-pager-dot.on,
+.lg-pager-dot.on {
+  width: 18px; border-radius: 999px;
+  background: var(--accent);
+}
+
+/* 小号按钮（用于卡片头内的次要操作） */
+.btn.sm { padding: 5px 12px; font-size: 13px; border-radius: 8px; }
+
+/* ============================================================
+   心情：今日心情卡片 + 扇形图
+   ============================================================ */
+.mo-today-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; margin-bottom: 14px;
+}
+.mo-today-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 8px;
+}
+.mo-today-date { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.mo-today-ops { display: flex; gap: 6px; }
+.mo-today-preview { display: flex; flex-direction: column; gap: 6px; }
+.mo-today-emojis { font-size: 28px; line-height: 1.1; }
+.mo-today-note {
+  font-size: 13.5px; line-height: 1.6; color: var(--text);
+  background: var(--surface-2); border-radius: 8px; padding: 8px 10px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.mo-today-empty { font-size: 13px; padding: 8px 0; }
+.mo-today-editor { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.mo-today-actions { display: flex; gap: 10px; }
+.mo-today-actions .btn { flex: 1; }
+
+/* 扇形图 */
+.mo-pie {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+  margin-bottom: 14px;
+}
+.mo-pie-svg-wrap { display: flex; justify-content: center; }
+.mo-pie-svg { width: 180px; height: 180px; }
+.mo-pie-legend { display: flex; flex-direction: column; gap: 4px; }
+.mo-pie-row {
+  display: grid; grid-template-columns: 14px 28px 1fr auto auto;
+  align-items: center; gap: 6px; font-size: 13px;
+}
+.mo-pie-dot { width: 10px; height: 10px; border-radius: 3px; }
+.mo-pie-e { font-size: 16px; line-height: 1; }
+.mo-pie-n { color: var(--muted); }
+.mo-pie-c { color: var(--text-strong); font-weight: 600; font-size: 12px; }
+.mo-pie-p { color: var(--accent-deep); font-size: 12px; min-width: 36px; text-align: right; }
+[data-theme="dark"] .mo-pie-p { color: var(--accent-soft); }/* ============================================================
+   横滑双页（mood / ledger 共用）
+   ============================================================ */
+.mo-pages,
+.lg-pages {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.mo-pages::-webkit-scrollbar,
+.lg-pages::-webkit-scrollbar { display: none; }
+.mo-page,
+.lg-page {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  min-width: 100%;
+  box-sizing: border-box;
+  padding-bottom: 12px;
+}
+.mo-pager,
+.lg-pager {
+  display: flex; gap: 6px; justify-content: center;
+  padding: 8px 0 4px;
+}
+.mo-pager-dot,
+.lg-pager-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); cursor: pointer;
+  transition: width .25s ease, background .25s ease;
+}
+.mo-pager-dot.on,
+.lg-pager-dot.on {
+  width: 18px; border-radius: 999px;
+  background: var(--accent);
+}
+
+/* 小号按钮（用于卡片头内的次要操作） */
+.btn.sm { padding: 5px 12px; font-size: 13px; border-radius: 8px; }
+
+/* ============================================================
+   心情：今日心情卡片 + 扇形图
+   ============================================================ */
+.mo-today-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; margin-bottom: 14px;
+}
+.mo-today-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 8px;
+}
+.mo-today-date { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.mo-today-ops { display: flex; gap: 6px; }
+.mo-today-preview { display: flex; flex-direction: column; gap: 6px; }
+.mo-today-emojis { font-size: 28px; line-height: 1.1; }
+.mo-today-note {
+  font-size: 13.5px; line-height: 1.6; color: var(--text);
+  background: var(--surface-2); border-radius: 8px; padding: 8px 10px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.mo-today-empty { font-size: 13px; padding: 8px 0; }
+.mo-today-editor { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.mo-today-actions { display: flex; gap: 10px; }
+.mo-today-actions .btn { flex: 1; }
+
+/* 扇形图 */
+.mo-pie {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+  margin-bottom: 14px;
+}
+.mo-pie-svg-wrap { display: flex; justify-content: center; }
+.mo-pie-svg { width: 180px; height: 180px; }
+.mo-pie-legend { display: flex; flex-direction: column; gap: 4px; }
+.mo-pie-row {
+  display: grid; grid-template-columns: 14px 28px 1fr auto auto;
+  align-items: center; gap: 6px; font-size: 13px;
+}
+.mo-pie-dot { width: 10px; height: 10px; border-radius: 3px; }
+.mo-pie-e { font-size: 16px; line-height: 1; }
+.mo-pie-n { color: var(--muted); }
+.mo-pie-c { color: var(--text-strong); font-weight: 600; font-size: 12px; }
+.mo-pie-p { color: var(--accent-deep); font-size: 12px; min-width: 36px; text-align: right; }
+[data-theme="dark"] .mo-pie-p { color: var(--accent-soft); }

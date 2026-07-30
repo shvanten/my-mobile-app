@@ -846,16 +846,17 @@ App.registerFeature({
         openMakeupModal(sheetTargetId);
         closeEditSheet();
       } else if (a === 'archive') {
-        if (confirm('确定收官「' + (habits.find((x) => x.id === sheetTargetId) || {}).name + '」？\n收官后可在「已收官」中查看历史记录。')) {
+        const h = habits.find((x) => x.id === sheetTargetId);
+        App.confirm('收官习惯', '确定收官「' + (h ? h.name : '') + '」？\n收官后可在「已收官」中查看历史记录。', () => {
           archiveHabit(sheetTargetId);
-        }
+        });
         closeEditSheet();
       } else if (a === 'delete') {
         const h = habits.find((x) => x.id === sheetTargetId);
         if (!h) { closeEditSheet(); return; }
-        if (confirm('确定删除「' + h.name + '」？\n此操作不可恢复，所有打卡记录将一并删除。')) {
+        App.confirm('删除习惯', '确定删除「' + h.name + '」？\n此操作不可恢复，所有打卡记录将一并删除。', () => {
           deleteHabit(sheetTargetId);
-        }
+        });
         closeEditSheet();
       }
     });
