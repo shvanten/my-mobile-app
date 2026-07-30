@@ -366,7 +366,15 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .ci-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .ci-head h2 { font-size: 22px; color: var(--text-strong); margin: 0; }
 
-.ci-habits { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px; -webkit-overflow-scrolling: touch; }
+/* 打卡根容器：flex column 让 .ci-cal 可用 flex:1 撑满剩余高度 */
+.ci {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.ci-habits { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 12px; flex: 0 0 auto; -webkit-overflow-scrolling: touch; }
 .ci-habits::-webkit-scrollbar { height: 0; }
 .ci-habit {
   flex: 0 0 auto;
@@ -388,25 +396,80 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .ci-habit-prog { font-size: 12px; color: var(--muted); }
 .ci-empty { color: var(--muted); font-size: 14px; padding: 8px 2px; }
 
-.ci-cal { margin-bottom: 18px; }
-.ci-cal-head { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 10px; }
-.ci-cal-title { font-size: 16px; color: var(--text-strong); min-width: 118px; text-align: center; }
-.ci-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 6px; }
-.ci-week span { text-align: center; font-size: 12px; color: var(--muted); }
-.ci-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+/* === 日历区：撑满剩余高度，可上下滚动，渲染连续多月 === */
+.ci-cal {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 4px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent-deep) 35%, transparent) transparent;
+}
+.ci-cal::-webkit-scrollbar { width: 4px; }
+.ci-cal::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent-deep) 35%, transparent); border-radius: 4px; }
+
+/* 单个月份块：8 列网格（月份标签列 + 日一二三四五六） */
+.ci-month-block {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  padding: 8px 4px;
+  border-radius: 14px;
+}
+/* 偶数月份块用稍深底色区分（与奇数月形成对比） */
+.ci-month-block.alt {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+}
+.ci-month-block.current {
+  background: color-mix(in srgb, var(--accent-soft) 40%, transparent);
+}
+
+.ci-month-row {
+  display: grid;
+  grid-template-columns: 32px repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+  align-items: center;
+}
+.ci-month-tag {
+  font-size: 12px;
+  color: var(--accent-deep);
+  font-weight: 600;
+  text-align: right;
+  padding-right: 6px;
+  line-height: 1;
+}
+.ci-month-tag:empty { visibility: hidden; }
+.ci-weekday {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 2px 0;
+  line-height: 1;
+}
+
+/* 月份块之间的虚线分隔：覆盖整个宽度（含月份标签列与周日列） */
+.ci-month-block + .ci-month-block {
+  border-top: 1px dashed color-mix(in srgb, var(--accent-deep) 50%, transparent);
+}
 
 .ci-day {
   position: relative;
   aspect-ratio: 1 / 1;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   background: color-mix(in srgb, var(--accent) calc(var(--depth, 0) * 70%), var(--surface-2));
   color: var(--text);
-  font-size: 15px;
+  font-size: 13px;
   cursor: pointer;
   overflow: hidden;
   display: flex; align-items: center; justify-content: center;
-  transition: background .2s ease, transform .1s ease;
+  transition: background .2s ease, transform .1s ease, box-shadow .15s ease;
 }
 .ci-day:active { transform: scale(.95); }
 .ci-day.empty { background: transparent; border: none; cursor: default; }
@@ -421,9 +484,6 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   opacity: .85;
 }
 .ci-day.full .ci-day-fill { opacity: 0; }
-
-.ci-stat { text-align: center; font-size: 13px; color: var(--muted); margin-top: 10px; }
-.ci-stat b { color: var(--accent-deep); }
 
 .ci-detail {
   background: transparent;

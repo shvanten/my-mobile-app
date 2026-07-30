@@ -119,8 +119,11 @@ App.registerFeature({
     // ---------- 状态 ----------
     let selHabitId = habits.length ? habits[0].id : null;
     const now = new Date();
-    let viewY = now.getFullYear();
-    let viewM = now.getMonth();
+    // 连续多月视图：起点 = 当前月往前推 VIEW_BACK；共 VIEW_MONTHS 个月
+    const VIEW_BACK = 18;       // 往前 18 个月
+    const VIEW_MONTHS = 36;     // 总共渲染 36 个月（前后各 18）
+    let viewStartY = now.getFullYear();
+    let viewStartM = now.getMonth() - VIEW_BACK;
     let selDate = todayStr();
 
     function selHabit() { return habits.find((h) => h.id === selHabitId) || null; }
@@ -189,36 +192,76 @@ App.registerFeature({
       while (cells.length % 7 !== 0) cells.push(null);
       return cells;
     }
+    // 把 (viewStartY, viewStartM + offset) 标准化为实际年月
+    function normYearMonth(offset) {
+      const totalM = viewStartM + offset;
+      const y = viewStartY + Math.floor(totalM / 12);
+      const m = ((totalM % 12) + 12) % 12;
+      return { y, m };
+    }
+    function monthTagText(y, m) { return (m + 1) + '月'; }
+    // 渲染单个"月份块"
+    function renderMonthBlock(y, m, habit) {
+      const t = todayStr();
+      const cells = monthCells(y, m);
+      const monthLabel = monthTagText(y, m);
+      const rows = Math.ceil(cells.length / 7);
+      let html = '<div class="ci-month-block" data-y="' + y + '" data-m="' + m + '">';
+      // 周标签行（顶部固定）：月份标签列空白 + 日一二三四五六
+      html += '<div class="ci-month-row ci-month-week">' +
+        '<span class="ci-month-tag"></span>' +
+        WD.map((w) => '<span class="ci-weekday">' + w + '</span>').join('') +
+        '</div>';
+      // 日期网格（按 7 个一组分行，每行前加月份标签列：第一行写月份，其他行占位空）
+      for (let r = 0; r < rows; r++) {
+        html += '<div class="ci-month-row">';
+        // 月份标签列：第一行写月份数字，其他行保留网格占位但内容空
+        html += '<span class="ci-month-tag">' + (r === 0 ? monthLabel : '') + '</span>';
+        for (let c = 0; c < 7; c++) {
+          const d = cells[r * 7 + c];
+          if (!d) { html += '<span class="ci-day empty"></span>'; continue; }
+          const ds = fmt(d);
+          const depth = dayDepth(habit, ds);
+          const cls = ['ci-day'];
+          if (ds === t) cls.push('today');
+          if (ds === selDate) cls.push('selected');
+          if (depth >= 1) cls.push('full');
+          html += '<button class="' + cls.join(' ') + '" type="button" data-date="' + ds + '" style="--depth:' + depth + '">' +
+            '<span class="ci-day-num">' + d.getDate() + '</span>' +
+            '<span class="ci-day-fill"></span>' +
+            '</button>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+      return html;
+    }
+    // 把 (年,月) 映射到当前视图里的 offset；若不在范围内返回 -1
+    function findOffset(y, m) {
+      for (let i = 0; i < VIEW_MONTHS; i++) {
+        const { y: yy, m: mm } = normYearMonth(i);
+        if (yy === y && mm === m) return i;
+      }
+      return -1;
+    }
     function paintCalendar() {
       const h = selHabit();
       if (!h) { calEl.innerHTML = ''; return; }
-      const cells = monthCells(viewY, viewM);
-      const t = todayStr();
-      let html = '<div class="ci-cal-head">' +
-        '<button class="icon-btn" id="ci-prev" type="button">‹</button>' +
-        '<span class="ci-cal-title">' + viewY + '年' + (viewM + 1) + '月</span>' +
-        '<button class="icon-btn" id="ci-next" type="button">›</button>' +
-        '</div>';
-      html += '<div class="ci-week">' + WD.map((w) => '<span>' + w + '</span>').join('') + '</div>';
-      html += '<div class="ci-grid">';
-      cells.forEach((d) => {
-        if (!d) { html += '<span class="ci-day empty"></span>'; return; }
-        const ds = fmt(d);
-        const depth = dayDepth(h, ds);
-        const cls = ['ci-day'];
-        if (ds === t) cls.push('today');
-        if (ds === selDate) cls.push('selected');
-        if (depth >= 1) cls.push('full');
-        html += '<button class="' + cls.join(' ') + '" type="button" data-date="' + ds + '" style="--depth:' + depth + '">' +
-          '<span class="ci-day-num">' + d.getDate() + '</span>' +
-          '<span class="ci-day-fill"></span>' +
-          '</button>';
-      });
-      html += '</div>';
-      const full = monthFullDays(h, viewY, viewM);
-      const st = streak(h);
-      html += '<div class="ci-stat">连续 <b>' + st + '</b> 天 · 本月全勤 <b>' + full + '</b> 天</div>';
+      let html = '';
+      for (let i = 0; i < VIEW_MONTHS; i++) {
+        const { y, m } = normYearMonth(i);
+        html += renderMonthBlock(y, m, h);
+      }
       calEl.innerHTML = html;
+    }
+    // 滚动到指定 (年,月) 块
+    function scrollToMonth(y, m) {
+      const block = calEl.querySelector('[data-y="' + y + '"][data-m="' + m + '"]');
+      if (block && calEl.scrollTo) {
+        // 滚动到该块，使月份标签刚好在视口顶部
+        const top = block.offsetTop;
+        calEl.scrollTo({ top, behavior: 'smooth' });
+      }
     }
 
     // ---------- 选中某天的明细（下方点亮份数） ----------
@@ -295,18 +338,11 @@ App.registerFeature({
       if (!b) return;
       selHabitId = b.dataset.id;
       // 切到该习惯的今天
-      const t = new Date();
-      viewY = t.getFullYear(); viewM = t.getMonth(); selDate = todayStr();
+      selDate = todayStr();
       refresh();
     });
 
     calEl.addEventListener('click', (e) => {
-      if (e.target.closest('#ci-prev')) {
-        viewM--; if (viewM < 0) { viewM = 11; viewY--; } paintCalendar(); paintDetail(); return;
-      }
-      if (e.target.closest('#ci-next')) {
-        viewM++; if (viewM > 11) { viewM = 0; viewY++; } paintCalendar(); paintDetail(); return;
-      }
       const day = e.target.closest('[data-date]');
       if (!day) return;
       const ds = day.dataset.date;
@@ -319,7 +355,10 @@ App.registerFeature({
         saveRecords();
         if (arr[0]) App.toast('已打卡 ✓');
       }
-      paintCalendar(); paintDetail();
+      // 只更新选中态（不重渲整片日历）
+      calEl.querySelectorAll('.ci-day.selected').forEach((el) => el.classList.remove('selected'));
+      day.classList.add('selected');
+      paintDetail();
     });
 
     detailEl.addEventListener('click', (e) => {
@@ -440,5 +479,8 @@ App.registerFeature({
 
     // ---------- 首次渲染 ----------
     refresh();
+    // 滚动到当前月（视图里第 VIEW_BACK 个月 = 当前月）
+    const cur = new Date();
+    scrollToMonth(cur.getFullYear(), cur.getMonth());
   }
 });
