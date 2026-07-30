@@ -202,19 +202,28 @@ App.registerFeature({
         '<span class="ci-detail-prog">' + done + ' / ' + h.parts + '</span>' +
         '</div>';
       if (locked) {
-        html += '<p class="ci-locked">已过日期，记录已锁定' + (full ? '（当天全勤）' : '（按完成份数留色）') + '</p>';
+        html += '<p class="ci-locked">悟已往之不谏，知来者之可追。</p>';
       }
       html += '<div class="ci-parts' + (editable ? '' : ' locked') + '">';
       const labels = (h.labels && h.labels.length === h.parts)
         ? h.labels
         : arr.map((_, i) => '第' + (i + 1) + '份');
       arr.forEach((on, i) => {
-        html += '<div class="ci-part-wrap">' +
-          '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '"' +
-          (editable ? '' : ' disabled') + '>' +
-          '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
-          '</button>' +
-          '</div>';
+        if (locked) {
+          // 已锁定日期：纯展示，方框填满（已完成深绿、未完成浅绿），不可点击
+          html += '<div class="ci-part-wrap">' +
+            '<div class="ci-part fill' + (on ? ' on' : '') + '">' +
+            '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
+            '</div>' +
+            '</div>';
+        } else {
+          html += '<div class="ci-part-wrap">' +
+            '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '"' +
+            (editable ? '' : ' disabled') + '>' +
+            '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
+            '</button>' +
+            '</div>';
+        }
       });
       html += '</div>';
       if (editable && full) html += '<p class="ci-done-tip">✓ 今天已全部完成</p>';

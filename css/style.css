@@ -464,6 +464,17 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 }
 .ci-part.on[disabled] { opacity: .7; }
 .ci-parts.locked .ci-part { cursor: default; }
+/* 锁定日期：方框整体填满（已完成实绿、未完成浅绿实心），去掉按钮的空心感 */
+.ci-parts.locked .ci-part { border-color: var(--accent); }
+.ci-parts.locked .ci-part:not(.on) {
+  background: var(--accent-soft);
+  color: var(--text-strong);
+}
+.ci-parts.locked .ci-part.on {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent-deep);
+}
 .ci-done-tip { text-align: center; color: var(--accent-deep); font-size: 14px; margin: 12px 0 0; }
 
 .ci-modal {
