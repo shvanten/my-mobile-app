@@ -431,30 +431,14 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
 
-/* 单个月份块：8 列网格（月份标签列 + 日一二三四五六），与上下月首尾相连不留空 */
-.ci-month-block {
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 auto;
-  padding: 0;
-}
-/* 偶数月份块用稍深底色区分（与奇数月形成对比），即时相邻也直接相连 */
-.ci-month-block.alt {
-  background: color-mix(in srgb, var(--surface-2) 45%, transparent);
-}
-.ci-month-block.current {
-  background: color-mix(in srgb, var(--accent-soft) 38%, transparent);
-}
-
-.ci-month-row {
+/* 连续网格：把多个月拼成一张 7 列连续日历（月份标签列 + 日一二三四五六）。
+   每个月首尾直接相连、不留空；月份之间的弯折虚线由 drawSeparators 绘制。 */
+.ci-grid {
   display: grid;
   grid-template-columns: 32px repeat(7, 1fr);
   gap: 4px;
-  margin-bottom: 4px;
   align-items: center;
 }
-/* 每个月的最后一行与下个月首行直接相邻（不留空） */
-.ci-month-row:last-child { margin-bottom: 0; }
 .ci-month-tag {
   font-size: 12px;
   color: var(--accent-deep);
@@ -494,7 +478,8 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   aspect-ratio: 1 / 1;
   border: 1px solid transparent;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) calc(var(--depth, 0) * 70%), var(--surface-2));
+  /* 底色由月份奇偶决定（--base），完成度(--depth)叠加在底色之上：越深=完成越多 */
+  background: color-mix(in srgb, var(--accent) calc(var(--depth, 0) * 70%), var(--base, var(--surface-2)));
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
@@ -502,6 +487,9 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   display: flex; align-items: center; justify-content: center;
   transition: background .2s ease, transform .1s ease, box-shadow .15s ease;
 }
+/* 月份奇偶着色：奇数月底色深一点、偶数月底色浅一点，便于区分不同月份 */
+.ci-day.m-odd  { --base: color-mix(in srgb, var(--surface-2) 50%, var(--accent-soft)); }
+.ci-day.m-even { --base: var(--surface-2); }
 .ci-day:active { transform: scale(.95); }
 .ci-day.empty { background: transparent; border: none; cursor: default; }
 .ci-day.today { border-color: var(--accent); }
