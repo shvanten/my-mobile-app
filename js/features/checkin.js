@@ -211,8 +211,9 @@ App.registerFeature({
       arr.forEach((on, i) => {
         html += '<div class="ci-part-wrap">' +
           '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '"' +
-          (editable ? '' : ' disabled') + ' aria-label="' + App.escapeHtml(labels[i]) + '"></button>' +
-          '<span class="ci-part-label">' + App.escapeHtml(labels[i] || '') + '</span>' +
+          (editable ? '' : ' disabled') + '>' +
+          '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
+          '</button>' +
           '</div>';
       });
       html += '</div>';

@@ -1,12 +1,10 @@
-const CACHE = 'myapp-v9';
+const CACHE = 'myapp-v10';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
   './js/app.js',
-  './js/features/hello.js',
-  './js/features/todo.js',
-  './js/features/notes.js',
+  './js/features/checkin.js',
   './manifest.json',
   './assets/icon.svg'
 ];
