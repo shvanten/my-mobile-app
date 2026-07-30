@@ -109,6 +109,8 @@ App.registerFeature({
       '        <input id="ci-custom" type="text" maxlength="2" placeholder="或自填" /></div>' +
       '      <div class="ci-field"><span>每天分几份</span>' +
       '        <input id="ci-parts" type="number" min="1" max="20" value="4" /></div>' +
+      '      <div class="ci-field"><span>各份任务内容（可留空，默认「第 N 份」）</span>' +
+      '        <div id="ci-labels" class="ci-labels"></div></div>' +
       '      <div class="ci-modal-actions">' +
       '        <button class="btn ghost" id="ci-cancel" type="button">取消</button>' +
       '        <button class="btn" id="ci-save" type="button">创建</button>' +
@@ -203,10 +205,15 @@ App.registerFeature({
         html += '<p class="ci-locked">已过日期，记录已锁定' + (full ? '（当天全勤）' : '（按完成份数留色）') + '</p>';
       }
       html += '<div class="ci-parts' + (editable ? '' : ' locked') + '">';
+      const labels = (h.labels && h.labels.length === h.parts)
+        ? h.labels
+        : arr.map((_, i) => '第' + (i + 1) + '份');
       arr.forEach((on, i) => {
-        html += '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '"' +
-          (editable ? '' : ' disabled') + '>' +
-          '<span class="ci-part-ic">' + App.escapeHtml(h.icon) + '</span></button>';
+        html += '<div class="ci-part-wrap">' +
+          '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '"' +
+          (editable ? '' : ' disabled') + ' aria-label="' + App.escapeHtml(labels[i]) + '"></button>' +
+          '<span class="ci-part-label">' + App.escapeHtml(labels[i] || '') + '</span>' +
+          '</div>';
       });
       html += '</div>';
       if (editable && full) html += '<p class="ci-done-tip">✓ 今天已全部完成</p>';
@@ -265,6 +272,21 @@ App.registerFeature({
     // ---------- 新建打卡 ----------
     const ICONS = ['💧', '🏃', '📚', '🧘', '💊', '🌿', '⏰', '🍎', '😴', '✍️'];
     let pickIcon = ICONS[0];
+    function renderLabelInputs() {
+      let n = parseInt(modal.querySelector('#ci-parts').value, 10);
+      if (!n || n < 1) n = 1; if (n > 20) n = 20;
+      const wrap = modal.querySelector('#ci-labels');
+      wrap.innerHTML = '';
+      for (let i = 0; i < n; i++) {
+        const inp = document.createElement('input');
+        inp.type = 'text';
+        inp.maxLength = 12;
+        inp.placeholder = '第' + (i + 1) + '份';
+        inp.className = 'ci-label-input';
+        inp.dataset.i = i;
+        wrap.appendChild(inp);
+      }
+    }
     function openModal() {
       modal.hidden = false;
       const icWrap = modal.querySelector('#ci-icons');
@@ -274,6 +296,7 @@ App.registerFeature({
       modal.querySelector('#ci-name').value = '';
       modal.querySelector('#ci-custom').value = '';
       modal.querySelector('#ci-parts').value = 4;
+      renderLabelInputs();
     }
     function closeModal() { modal.hidden = true; }
     modal.querySelector('#ci-icons').addEventListener('click', (e) => {
@@ -286,6 +309,8 @@ App.registerFeature({
       const v = e.target.value.trim();
       if (v) { pickIcon = v; modal.querySelectorAll('.ci-ic').forEach((x) => x.classList.remove('on')); }
     });
+    // 份数变化时重渲输入框（输入变化时立刻同步，不丢已写内容）
+    modal.querySelector('#ci-parts').addEventListener('input', renderLabelInputs);
     modal.querySelector('#ci-cancel').addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
     modal.querySelector('#ci-save').addEventListener('click', () => {
@@ -293,7 +318,14 @@ App.registerFeature({
       let parts = parseInt(modal.querySelector('#ci-parts').value, 10);
       if (!name) { App.toast('请填写名称'); return; }
       if (!parts || parts < 1) parts = 1; if (parts > 20) parts = 20;
-      const habit = { id: 'h' + Date.now(), name: name, icon: pickIcon, parts: parts };
+      // 读取每份的文字描述；空字符串留空（前端显示时回退到「第 N 份」）
+      const labelInputs = modal.querySelectorAll('#ci-labels .ci-label-input');
+      const labels = [];
+      for (let i = 0; i < parts; i++) {
+        const v = labelInputs[i] && labelInputs[i].value.trim();
+        labels.push(v || '');
+      }
+      const habit = { id: 'h' + Date.now(), name: name, icon: pickIcon, parts: parts, labels: labels };
       habits.push(habit); saveHabits();
       selHabitId = habit.id;
       closeModal();
