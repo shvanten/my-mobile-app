@@ -607,16 +607,30 @@ App.registerFeature({
         const w = im.width * ratio, h = im.height * ratio;
         ctx.drawImage(im, (r.width - w) / 2, (r.height - h) / 2, w, h);
       }
+      // 平滑路径：把采样点之间用二次贝塞尔曲线串起来（中点为锚点，相邻点为控制点）
+      function strokeSmooth(s) {
+        const pts = s.pts;
+        if (!pts || pts.length === 0) return;
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        if (pts.length === 1) { ctx.stroke(); return; }
+        if (pts.length === 2) { ctx.lineTo(pts[1][0], pts[1][1]); ctx.stroke(); return; }
+        for (let i = 1; i < pts.length - 1; i++) {
+          const mx = (pts[i][0] + pts[i + 1][0]) / 2;
+          const my = (pts[i][1] + pts[i + 1][1]) / 2;
+          ctx.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+        }
+        const last = pts[pts.length - 1];
+        ctx.lineTo(last[0], last[1]);
+        ctx.stroke();
+      }
       function drawStrokes() {
         (page().strokes || []).forEach((s, idx) => {
           if (!s.pts || s.pts.length === 0) return;
-          ctx.beginPath();
           ctx.strokeStyle = s.color || '#274027';
           ctx.lineWidth = s.width || 3;
           ctx.globalAlpha = s.tool === 'marker' ? 0.42 : 1;
-          ctx.moveTo(s.pts[0][0], s.pts[0][1]);
-          for (let i = 1; i < s.pts.length; i++) ctx.lineTo(s.pts[i][0], s.pts[i][1]);
-          ctx.stroke();
+          strokeSmooth(s);
           ctx.globalAlpha = 1;
           if (selected.has(idx)) {
             const bb = bbox(s);
@@ -676,7 +690,13 @@ App.registerFeature({
       }
 
       // ---------- 画笔事件 ----------
+      // MIN_STEP：相邻采样点的最小距离（像素）。小于这个距离的点直接丢弃，避免堆点数。
+      // STEP：插值步长。距离 > STEP 时自动插入中间点，确保曲线丝滑。
+      const MIN_STEP = 2;
+      const STEP = 3.5;
       let drawing = false, lastX = 0, lastY = 0, curStroke = null, drawPrev = null;
+      // drawnTo：画布上"已经画到的位置"。用它和最新点画一段贝塞尔，实时绘制也不会出现折痕。
+      let drawnTo = null;
       let erasing = false, erasingChanged = false, erasePrev = null;
       let lassoing = false;
       let dragging = false, dragPrev = null, dragMoved = false, dragPrevSnap = null;
@@ -687,6 +707,24 @@ App.registerFeature({
         return { x: t.clientX - r.left, y: t.clientY - r.top };
       }
 
+      // 距离太近直接丢弃 + 距离太远自动插值
+      function pushSmoothPoint(stroke, x, y) {
+        const last = stroke.pts[stroke.pts.length - 1];
+        if (last) {
+          const dx = x - last[0], dy = y - last[1];
+          const d = Math.hypot(dx, dy);
+          if (d < MIN_STEP) return false;
+          const steps = Math.max(1, Math.ceil(d / STEP));
+          for (let i = 1; i <= steps; i++) {
+            const t = i / steps;
+            stroke.pts.push([last[0] + dx * t, last[1] + dy * t]);
+          }
+        } else {
+          stroke.pts.push([x, y]);
+        }
+        return true;
+      }
+
       function start(e) {
         e.preventDefault();
         const p = pos(e);
@@ -694,7 +732,7 @@ App.registerFeature({
           drawing = true; lastX = p.x; lastY = p.y; drawPrev = snapshot();
           const w = tool === 'marker' ? Math.max(8, curWidth * 3) : curWidth;
           curStroke = { pts: [[p.x, p.y]], color: curColor, width: w, tool: tool };
-          redraw();
+          drawnTo = [p.x, p.y];
         } else if (tool === 'eraser') {
           erasing = true; erasingChanged = false; erasePrev = snapshot();
           lastX = p.x; lastY = p.y;
@@ -717,12 +755,20 @@ App.registerFeature({
         e.preventDefault();
         const p = pos(e);
         if (drawing && curStroke) {
-          curStroke.pts.push([p.x, p.y]);
+          const accepted = pushSmoothPoint(curStroke, p.x, p.y);
+          if (!accepted) return;
+          const newPt = curStroke.pts[curStroke.pts.length - 1];
+          const prevPt = curStroke.pts.length >= 2 ? curStroke.pts[curStroke.pts.length - 2] : newPt;
           ctx.strokeStyle = curStroke.color; ctx.lineWidth = curStroke.width;
           ctx.globalAlpha = curStroke.tool === 'marker' ? 0.42 : 1;
-          ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+          // 从上次画到的位置到新点，用"上一个采样点"作控制点，画一段二次贝塞尔
+          ctx.beginPath();
+          ctx.moveTo(drawnTo[0], drawnTo[1]);
+          ctx.quadraticCurveTo(prevPt[0], prevPt[1], newPt[0], newPt[1]);
+          ctx.stroke();
           ctx.globalAlpha = 1;
-          lastX = p.x; lastY = p.y;
+          drawnTo = [newPt[0], newPt[1]];
+          lastX = newPt[0]; lastY = newPt[1];
         } else if (erasing) {
           const er = Math.max(10, curWidth * 2 + 6);
           let removed = false;
@@ -747,9 +793,10 @@ App.registerFeature({
         if (drawing) {
           drawing = false;
           if (curStroke) {
-            // 抽稀 + 入栈
+            // 入栈（已经在 pushSmoothPoint 里做过插值）
             if (curStroke.pts.length > 1) { page().strokes.push(curStroke); commit(drawPrev); }
             curStroke = null;
+            drawnTo = null;
             redraw();
           }
         } else if (erasing) {

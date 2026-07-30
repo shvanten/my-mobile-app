@@ -329,7 +329,12 @@ App.registerFeature({
     }
     async function pull() {
       if (!cfg.token) throw new Error('请先填写 GitHub Token');
-      if (!cfg.gistId) throw new Error('云端还没有数据，请先推送一次');
+      if (!cfg.gistId) {
+        // 自动找同 Token 下的同步 Gist（其它设备可能已建过）
+        const found = await findSyncGist();
+        if (!found) throw new Error('云端还没有数据，请先在有数据的设备上点「立即推送」');
+        cfg.gistId = found; saveCfg();
+      }
       const data = await api('GET', 'https://api.github.com/gists/' + cfg.gistId);
       const f = data.files && data.files['myapp-sync.json'];
       if (!f) throw new Error('云端 Gist 找不到数据文件');
@@ -358,9 +363,9 @@ App.registerFeature({
       return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
     }
     function statusText() {
-      if (!cfg.token) return { title: '未配置', desc: '请填写 GitHub Token 并连接', kind: 'warn' };
-      if (!cfg.gistId) return { title: '未连接', desc: '点击「立即推送」即可创建云端存储', kind: 'warn' };
-      return { title: '已连接', desc: 'Gist #' + cfg.gistId, kind: 'ok' };
+      if (!cfg.token) return { title: '未配置 Token', desc: '从第 ① 步开始', kind: 'warn', step: 1 };
+      if (!cfg.gistId) return { title: 'Token 已保存', desc: '下一步：测试连接', kind: 'warn', step: 2 };
+      return { title: '已连接', desc: '云端 Gist #' + cfg.gistId.slice(0, 8) + '…', kind: 'ok', step: 3 };
     }
 
     container.innerHTML =
@@ -368,41 +373,49 @@ App.registerFeature({
       '  <div class="sy-head"><h2>云端同步</h2><span class="muted">手机 / 平板 / 电脑数据互通</span></div>' +
       '  <div class="sy-body">' +
       '    <div class="sy-status" id="sy-status"></div>' +
+      '    <div class="sy-progress" id="sy-progress">' +
+      '      <div class="sy-pg-step" data-step="1"><span class="sy-pg-num">①</span><span class="sy-pg-label">填 Token</span></div>' +
+      '      <div class="sy-pg-line"></div>' +
+      '      <div class="sy-pg-step" data-step="2"><span class="sy-pg-num">②</span><span class="sy-pg-label">连接</span></div>' +
+      '      <div class="sy-pg-line"></div>' +
+      '      <div class="sy-pg-step" data-step="3"><span class="sy-pg-num">③</span><span class="sy-pg-label">推送</span></div>' +
+      '    </div>' +
 
-      '    <details class="sy-card sy-card-guide" id="sy-guide">' +
-      '      <summary class="sy-card-title">📘 三步上手（点开看教程）</summary>' +
-      '      <div class="sy-guide-body">' +
-      '        <p class="sy-guide-intro">方案 A 用 <b>GitHub Gist</b> 当云端。一个 Private Gist 装下所有数据，免费、私密。</p>' +
-      '        <ol class="sy-guide-steps">' +
-      '          <li><b>生成 Token</b>：打开 <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> → <b>Generate new token (classic)</b> → <b>只勾 gist 权限</b> → 生成（形如 <code>ghp_xxxx…</code>）</li>' +
-      '          <li><b>填写 + 测试</b>：把 Token 粘到下方输入框 → 点「测试 Token」→ 显示 <code>Token 有效（你的用户名）</code> 就成功</li>' +
-      '          <li><b>在一台设备点「立即推送」</b>：会自动创建一个带固定标记的 Private Gist（所有设备共用同一个）</li>' +
-      '        </ol>' +
-      '        <p class="sy-guide-next">另一台设备同样配置<b>同一个 Token</b>，进入「同步」页会自动找到同一个 Gist 并拉取（也可点「立即拉取 / 🔄 同步」）。刷新页面即可看到数据。</p>' +
-      '        <p class="sy-guide-tip">💡 推送时会和云端<b>合并</b>（记账按每笔合并、不会互相覆盖），所以在任意设备点「🔄 同步」都很安全。</p>' +
-      '      </div>' +
-      '    </details>' +
-
-      '    <div class="sy-card">' +
-      '      <div class="sy-card-title">① 配置 GitHub Token</div>' +
-      '      <div class="sy-hint">在 GitHub → Settings → Developer settings → Personal access tokens 生成，<b>只需勾选 gist 权限</b>，无需其他勾选。</div>' +
+      '    <div class="sy-card sy-card-step" id="sy-step-1">' +
+      '      <div class="sy-card-title">① 填 GitHub Token</div>' +
+      '      <div class="sy-hint">在你的 GitHub 账号生成一个 Token，<b>只勾选 gist 权限</b>就够用：</div>' +
+      '      <ol class="sy-ol">' +
+      '        <li>点 <a href="https://github.com/settings/tokens/new" target="_blank" rel="noopener">打开页面</a>（建议保留标签页）</li>' +
+      '        <li>Note 随便填（如「我的 App」）</li>' +
+      '        <li>Expiration 选 90 天或更长</li>' +
+      '        <li>下方权限 <b>只勾 gist</b>，其它一律不勾</li>' +
+      '        <li>点底部绿色 <b>Generate token</b> → 复制 <code>ghp_…</code> 开头的字符串</li>' +
+      '      </ol>' +
       '      <div class="sy-row">' +
       '        <input type="password" id="sy-token" class="sy-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />' +
       '        <button class="btn ghost sm" id="sy-show" type="button">显示</button>' +
       '      </div>' +
       '      <div class="sy-actions">' +
-      '        <button class="btn ghost sm" id="sy-test" type="button">测试 Token</button>' +
-      '        <button class="btn sm" id="sy-save" type="button">保存配置</button>' +
-      '        <button class="btn ghost sm" id="sy-forget" type="button">忘记 Token</button>' +
+      '        <button class="btn" id="sy-save" type="button">保存 Token →</button>' +
       '      </div>' +
-      '      <div class="sy-tip" id="sy-token-status"></div>' +
+      '      <div class="sy-tip" id="sy-token-status">还没填 Token</div>' +
       '    </div>' +
 
-      '    <div class="sy-card">' +
-      '      <div class="sy-card-title">② 同步操作</div>' +
+      '    <div class="sy-card sy-card-step" id="sy-step-2">' +
+      '      <div class="sy-card-title">② 测试 + 连接</div>' +
+      '      <div class="sy-hint">点下面按钮会自动：验证 Token → 在你的账号下查找是否已有同步 Gist（多端会自动复用同一个）</div>' +
       '      <div class="sy-actions">' +
-      '        <button class="btn" id="sy-push" type="button">⬆ 立即推送</button>' +
-      '        <button class="btn" id="sy-pull" type="button">⬇ 立即拉取</button>' +
+      '        <button class="btn" id="sy-test" type="button">🔍 测试 Token 并查找云端</button>' +
+      '      </div>' +
+      '      <div class="sy-tip" id="sy-test-status">等待测试</div>' +
+      '    </div>' +
+
+      '    <div class="sy-card sy-card-step" id="sy-step-3">' +
+      '      <div class="sy-card-title">③ 推送 / 拉取</div>' +
+      '      <div class="sy-hint">连接成功后，<b>首次必须在一台设备上点「立即推送」</b>创建云端数据。其它设备再点「立即拉取」就能拿到。</div>' +
+      '      <div class="sy-actions">' +
+      '        <button class="btn" id="sy-push" type="button">⬆ 立即推送（创建/更新云端）</button>' +
+      '        <button class="btn" id="sy-pull" type="button">⬇ 立即拉取（从云端下载）</button>' +
       '        <button class="btn ghost" id="sy-both" type="button">🔄 同步（先拉后推）</button>' +
       '      </div>' +
       '      <div class="sy-meta">' +
@@ -413,31 +426,48 @@ App.registerFeature({
       '        <input type="checkbox" id="sy-auto"' + (cfg.auto ? ' checked' : '') + ' />' +
       '        <span>数据变更后自动推送（5 秒）</span>' +
       '      </label>' +
+      '      <div class="sy-tip" id="sy-sync-status"></div>' +
       '    </div>' +
 
-      '    <div class="sy-card">' +
-      '      <div class="sy-card-title">③ 备份（不需要账号）</div>' +
-      '      <div class="sy-hint">把数据导出为 JSON 文件，可换设备时导入；适合不放心把 Token 交给浏览器的人。</div>' +
-      '      <div class="sy-actions">' +
-      '        <button class="btn" id="sy-export" type="button">⬇ 导出 JSON</button>' +
-      '        <button class="btn ghost" id="sy-import" type="button">⬆ 导入 JSON</button>' +
-      '        <input type="file" id="sy-file" accept="application/json" hidden />' +
+      '    <details class="sy-card sy-card-guide">' +
+      '      <summary class="sy-card-title">📘 多端怎么用？（点开看）</summary>' +
+      '      <div class="sy-guide-body">' +
+      '        <p><b>设备 A（有数据）</b>：同步页 → 填 Token → 测试 → 「立即推送」（云端建好仓库）</p>' +
+      '        <p><b>设备 B / C / 平板 / 电脑（空的）</b>：同样填<b>同一个 Token</b> → 测试 → 「立即拉取」或「🔄 同步」→ 弹窗点「立即刷新」</p>' +
+      '        <p class="sy-guide-tip">💡 Token 一样就共用同一个 Gist，不用记 Gist ID。「同步」按钮是「先拉后推」，最安全；每次写完数据 5 秒后会自动推。</p>' +
       '      </div>' +
-      '    </div>' +
+      '    </details>' +
 
-      '    <div class="sy-card sy-card-warn">' +
-      '      <div class="sy-card-title">⚠️ 隐私与安全</div>' +
-      '      <ul class="sy-tips">' +
-      '        <li>Token 仅保存在你这台设备的 localStorage，不会上传到任何第三方服务器。</li>' +
-      '        <li>建议 Token 只勾选 <b>gist</b> 权限，定期更换；不用时点「忘记 Token」清除。</li>' +
-      '        <li>数据存储在 GitHub 的 Private Gist（私密 gist，仅你可见）。</li>' +
-      '        <li>「拉取」会与云端合并（记录按条目合并，不会丢失），合并后刷新页面即可看到。</li>' +
-      '      </ul>' +
-      '    </div>' +
+      '    <details class="sy-card">' +
+      '      <summary class="sy-card-title">📂 备份（无需账号）</summary>' +
+      '      <div class="sy-guide-body">' +
+      '        <p>不放心把 Token 给浏览器？把数据导出成 JSON 文件，换设备时再导入：</p>' +
+      '        <div class="sy-actions">' +
+      '          <button class="btn" id="sy-export" type="button">⬇ 导出 JSON</button>' +
+      '          <button class="btn ghost" id="sy-import" type="button">⬆ 导入 JSON</button>' +
+      '          <input type="file" id="sy-file" accept="application/json" hidden />' +
+      '        </div>' +
+      '      </div>' +
+      '    </details>' +
+
+      '    <details class="sy-card sy-card-warn">' +
+      '      <summary class="sy-card-title">⚠️ 隐私 & 退出</summary>' +
+      '      <div class="sy-guide-body">' +
+      '        <ul class="sy-tips">' +
+      '          <li>Token 只存在本机 localStorage，不上传第三方。</li>' +
+      '          <li>建议 Token <b>只勾 gist</b> 权限，定期换。</li>' +
+      '          <li>数据存在 GitHub Private Gist（只有你能看）。</li>' +
+      '        </ul>' +
+      '        <div class="sy-actions">' +
+      '          <button class="btn ghost sm" id="sy-forget" type="button">🚪 忘记 Token（清空配置）</button>' +
+      '        </div>' +
+      '      </div>' +
+      '    </details>' +
       '  </div>' +
       '</div>';
 
     const statusEl = container.querySelector('#sy-status');
+    const progressEl = container.querySelector('#sy-progress');
     function paintStatus() {
       const s = statusText();
       statusEl.className = 'sy-status sy-status-' + s.kind;
@@ -445,11 +475,27 @@ App.registerFeature({
         '<div class="sy-status-dot"></div>' +
         '<div><div class="sy-status-title">' + App.escapeHtml(s.title) + '</div>' +
         '<div class="sy-status-desc">' + App.escapeHtml(s.desc) + '</div></div>';
+      // 高亮进度条对应步骤
+      progressEl.querySelectorAll('.sy-pg-step').forEach((el) => {
+        el.classList.toggle('on', Number(el.dataset.step) <= s.step);
+      });
+      progressEl.querySelectorAll('.sy-pg-line').forEach((el) => {
+        // 第一条线对应 1→2，第二条 2→3
+        const before = Number(progressEl.querySelector('.sy-pg-step:nth-child(3)').dataset.step); // 2
+        const idx = Array.from(progressEl.querySelectorAll('.sy-pg-line')).indexOf(el);
+        el.classList.toggle('on', s.step >= (idx + 2));
+      });
+      // 把当前步骤对应的卡片置顶、其它折叠（简化：只高亮）
+      container.querySelectorAll('.sy-card-step').forEach((c) => c.classList.remove('sy-card-active'));
+      const cur = container.querySelector('#sy-step-' + s.step);
+      if (cur) cur.classList.add('sy-card-active');
     }
     paintStatus();
 
     const tokenInput = container.querySelector('#sy-token');
     const tokenStatusEl = container.querySelector('#sy-token-status');
+    const testStatusEl = container.querySelector('#sy-test-status');
+    const syncStatusEl = container.querySelector('#sy-sync-status');
     if (cfg.token) tokenInput.value = cfg.token;
 
     container.querySelector('#sy-show').addEventListener('click', () => {
@@ -458,20 +504,29 @@ App.registerFeature({
     container.querySelector('#sy-save').addEventListener('click', () => {
       cfg.token = tokenInput.value.trim();
       saveCfg();
-      tokenStatusEl.textContent = cfg.token ? '✓ 已保存（' + cfg.token.slice(0, 4) + '…）' : '已清空';
+      tokenStatusEl.textContent = cfg.token ? '✓ 已保存（' + cfg.token.slice(0, 4) + '…） · 下一步：点 ② 的测试按钮' : '已清空';
       paintStatus();
       App.toast('已保存');
     });
     container.querySelector('#sy-test').addEventListener('click', async () => {
       cfg.token = tokenInput.value.trim();
       saveCfg();
-      tokenStatusEl.textContent = '测试中…';
+      if (!cfg.token) { testStatusEl.textContent = '✗ Token 为空，请先填入'; return; }
+      testStatusEl.textContent = '🔍 验证 Token…';
       try {
         const login = await testToken();
-        tokenStatusEl.textContent = '✓ Token 有效（' + login + '）';
-        App.toast('Token 有效');
+        testStatusEl.textContent = '✓ Token 有效（' + login + '）· 正在查找云端…';
+        const found = await findSyncGist();
+        if (found) {
+          cfg.gistId = found; saveCfg();
+          testStatusEl.textContent = '✓ 已连接 · 找到你账号下的同步 Gist';
+          App.toast('已连接云端');
+        } else {
+          testStatusEl.textContent = '✓ Token 有效（' + login + '）· 云端还没有数据，下一步点「立即推送」创建';
+        }
+        paintStatus();
       } catch (e) {
-        tokenStatusEl.textContent = '✗ ' + e.message;
+        testStatusEl.textContent = '✗ ' + e.message;
       }
     });
     container.querySelector('#sy-forget').addEventListener('click', () => {
@@ -487,14 +542,20 @@ App.registerFeature({
       });
     });
     container.querySelector('#sy-push').addEventListener('click', async () => {
-      try { await push(); paintStatus(); container.querySelector('#sy-last-push').textContent = fmtTime(cfg.lastPush); App.toast('✓ 已推送（已与云端合并）'); }
-      catch (e) { App.toast('推送失败：' + e.message); }
+      try {
+        await push();
+        paintStatus();
+        container.querySelector('#sy-last-push').textContent = fmtTime(cfg.lastPush);
+        if (syncStatusEl) syncStatusEl.textContent = '✓ 已推送（云端 Gist #' + cfg.gistId.slice(0, 8) + '…）';
+        App.toast('✓ 已推送（已与云端合并）');
+      } catch (e) { App.toast('推送失败：' + e.message); }
     });
     container.querySelector('#sy-pull').addEventListener('click', async () => {
       try {
         const n = await pull();
         paintStatus();
         container.querySelector('#sy-last-pull').textContent = fmtTime(cfg.lastPull);
+        if (syncStatusEl) syncStatusEl.textContent = '✓ 已拉取（' + n + ' 项），刷新页面后生效';
         App.toast('✓ 已拉取（' + n + ' 项）');
         App.confirm('已拉取云端数据', '为看到新数据，请刷新页面（关闭后重新打开）。立即刷新？', () => location.reload());
       } catch (e) { App.toast('拉取失败：' + e.message); }
@@ -512,6 +573,7 @@ App.registerFeature({
         await push();
         container.querySelector('#sy-last-push').textContent = fmtTime(cfg.lastPush);
         paintStatus();
+        if (syncStatusEl) syncStatusEl.textContent = '✓ 同步完成（云端 Gist #' + cfg.gistId.slice(0, 8) + '…）';
         App.toast('✓ 同步完成');
         App.confirm('同步完成', '为看到新数据，请刷新页面。立即刷新？', () => location.reload());
       } catch (e) { App.toast('同步失败：' + e.message); }

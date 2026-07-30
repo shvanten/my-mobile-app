@@ -2483,3 +2483,39 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .sy-tips li { margin: 2px 0; }
 .sy-tips b { color: var(--text-strong); }
 
+/* —— 同步向导：进度条 —— */
+.sy-progress {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 10px 14px; margin-bottom: 14px;
+}
+.sy-pg-step {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--muted); font-size: 13px;
+  opacity: .55; transition: opacity .25s, color .25s;
+}
+.sy-pg-step.on { opacity: 1; color: var(--text-strong); font-weight: 600; }
+.sy-pg-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--border); color: var(--surface);
+  font-size: 12px; font-weight: 700;
+  transition: background .25s;
+}
+.sy-pg-step.on .sy-pg-num { background: var(--accent); color: var(--on-accent); }
+.sy-pg-line {
+  flex: 1; height: 3px; border-radius: 2px;
+  background: var(--border); transition: background .25s;
+}
+.sy-pg-line.on { background: var(--accent); }
+
+/* —— 当前步骤高亮 —— */
+.sy-card-step { opacity: .55; transition: opacity .25s, border-color .25s, box-shadow .25s; }
+.sy-card-step.sy-card-active { opacity: 1; border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
+
+/* —— 步骤编号列表（生成 Token 那段） —— */
+.sy-ol { padding-left: 22px; margin: 6px 0 10px; font-size: 13px; color: var(--text); line-height: 1.7; }
+.sy-ol li { margin: 2px 0; }
+.sy-ol b { color: var(--text-strong); }
+.sy-ol code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; color: var(--accent-deep); }
+
