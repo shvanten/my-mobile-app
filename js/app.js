@@ -1,6 +1,7 @@
 /**
- * 核心框架：负责主题、路由、首页渲染、轻提示、PWA。
+ * 核心框架：左侧功能导航 + 右侧内容区。
  * 你以后基本不用改这个文件，只需要在 js/features/ 里加功能文件即可。
+ * 布局：电脑上左侧固定一列导航、右侧内容；手机上左侧收窄成图标栏。
  */
 (function () {
   'use strict';
@@ -47,53 +48,51 @@
     return { name: 'home' };
   }
 
-  // ===== 渲染 =====
+  // ===== DOM 引用 =====
   const view = document.getElementById('view');
-  const titleEl = document.getElementById('app-title');
-  const backBtn = document.getElementById('back-btn');
+  const nav = document.getElementById('side-nav');
 
+  // ===== 左侧导航 =====
+  function buildSidebar() {
+    nav.innerHTML = '';
+    features.forEach((f) => {
+      const item = document.createElement('button');
+      item.className = 'nav-item';
+      item.type = 'button';
+      item.dataset.id = f.id;
+      item.innerHTML =
+        '<span class="nav-icon">' + (f.icon || '📱') + '</span>' +
+        '<span class="nav-label">' + escapeHtml(f.title || f.id) + '</span>';
+      item.addEventListener('click', () => navigate(f.id));
+      nav.appendChild(item);
+    });
+  }
+  function setActiveNav(id) {
+    nav.querySelectorAll('.nav-item').forEach((el) => {
+      el.classList.toggle('active', el.dataset.id === id);
+    });
+  }
+
+  // ===== 渲染 =====
   function renderHome() {
-    titleEl.textContent = '我的应用';
-    backBtn.hidden = true;
+    setActiveNav(null);
     view.className = 'home-view';
     view.style.removeProperty('--accent');
-
-    const grid = document.createElement('div');
-    grid.className = 'grid';
-
-    features.forEach((f) => {
-      const card = document.createElement('button');
-      card.className = 'card';
-      card.style.setProperty('--accent', f.color || '#9aa7ad');
-      // 简洁为主：首页卡片只保留图标 + 名称，不显示描述
-      card.innerHTML =
-        '<span class="card-icon">' + (f.icon || '📱') + '</span>' +
-        '<span class="card-title">' + escapeHtml(f.title || f.id) + '</span>';
-      card.addEventListener('click', () => navigate(f.id));
-      grid.appendChild(card);
-    });
-
-    // 「添加功能」说明卡：仅一个 ➕ 与一个极简标签
-    const add = document.createElement('button');
-    add.className = 'card card-add';
-    add.innerHTML =
-      '<span class="card-icon">➕</span>' +
-      '<span class="card-title">添加</span>';
-    add.addEventListener('click', showAddHint);
-    grid.appendChild(add);
-
-    view.innerHTML = '';
-    view.appendChild(grid);
+    view.innerHTML =
+      '<div class="welcome">' +
+      '  <div class="welcome-emoji">🌿</div>' +
+      '  <h2>我的应用</h2>' +
+      '  <p class="muted">从左侧选择功能开始</p>' +
+      '</div>';
   }
 
   function renderFeature(id) {
     const f = getFeature(id);
     if (!f) { navigate(); return; }
-    titleEl.textContent = f.title || f.id;
-    backBtn.hidden = false;
-    // 进入功能页：把该功能的主色注入整个界面，全页同色系
+    setActiveNav(f.id);
+    // 进入功能：把该功能的主色注入内容区，全页同色系（同一区块只有这一个主色）
     view.className = 'feature-view';
-    view.style.setProperty('--accent', f.color || '#9aa7ad');
+    view.style.setProperty('--accent', f.color || '#6fa860');
     view.innerHTML = '';
     const content = document.createElement('div');
     content.className = 'feature';
@@ -112,6 +111,7 @@
     else renderHome();
   }
 
+  // ===== 添加功能提示 =====
   function showAddHint() {
     toast('在 js/features 新建一个 .js 文件，调用 App.registerFeature({...})，再到 index.html 加一行 <script> 引入即可。');
   }
@@ -132,8 +132,9 @@
   }
 
   // ===== 启动 =====
-  backBtn.addEventListener('click', () => navigate());
+  buildSidebar();
   document.getElementById('theme-btn').addEventListener('click', toggleTheme);
+  document.getElementById('nav-add').addEventListener('click', showAddHint);
   window.addEventListener('hashchange', render);
 
   applyTheme(getPreferredTheme());

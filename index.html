@@ -2,29 +2,37 @@
 <html lang="zh-CN" data-theme="light">
 <head>
   <meta charset="UTF-8" />
-  <!-- 手机专用：禁止缩放、适配刘海屏 -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#6b9b7a" />
+  <!-- 桌面 + 手机通用：适配刘海屏，允许缩放（电脑上好用） -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#6fa860" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" href="assets/icon.svg" />
   <link rel="apple-touch-icon" href="assets/icon.svg" />
-  <title>我的手机应用</title>
+  <title>我的应用</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
   <div id="app">
-    <header id="app-header">
-      <button id="back-btn" class="icon-btn" aria-label="返回" hidden>‹</button>
-      <h1 id="app-title">我的应用</h1>
-      <button id="theme-btn" class="icon-btn" aria-label="切换主题">🌙</button>
-    </header>
+    <!-- 左侧：功能导航单独成列 -->
+    <aside id="sidebar">
+      <div id="side-head">
+        <h1 id="side-title">我的应用</h1>
+        <button id="theme-btn" class="icon-btn" aria-label="切换主题">🌙</button>
+      </div>
+      <nav id="side-nav"></nav>
+      <div id="side-foot">
+        <button id="nav-add" class="nav-item nav-add" type="button">
+          <span class="nav-icon">➕</span>
+          <span class="nav-label">添加功能</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- 右侧：内容区 -->
     <main id="view"></main>
-    <footer id="app-footer">
-      <p class="hint">轻触卡片进入</p>
-    </footer>
   </div>
 
   <!-- 1) 先加载核心框架 -->

@@ -1,49 +1,42 @@
 /* ============================================================
-   绿色主调 · 手机应用框架样式
-   - 主界面绿色主色，按明度做成"等间距小步长"梯度：
-       背景 → 卡片 → 输入框/框 → 边框 → 浅绿装饰
-            → 主绿 → 按钮 → 标题(最深)
-   - 每条相邻层级只差约 6% 明度，过渡平滑、饱和度适中偏低
-   - 同一区块只用绿色同系深浅，不混入第二种色相
+   绿色主调 · 左侧导航 + 右侧内容（桌面 / 手机通用）
+   - 绿色等间距小步长梯度（相邻层级约 -6% 明度）
+   - 左侧单独成列的功能导航；右侧内容区按功能同色系渲染
    ============================================================ */
 
 :root {
-  /* —— 绿色梯度（明度由浅到深，逐级约 -6%）——
-     #eef4ea → #e3ece0 → #dbe5d3 → #cad9c0 → #b2cb9f
-            → #6fa860 → #557f4f → #274027                      */
-
+  /* —— 绿色梯度（明度由浅到深，逐级约 -6%）—— */
   --bg:          #eef4ea;   /* ① 最浅：页面背景 */
-  --card:        #e3ece0;   /* ② 卡片面板（比背景深一档） */
-  --surface:     #e7efe2;   /* 通用表面 / 聚焦态 */
-  --surface-2:   #dbe5d3;   /* ③ 输入框、待办项、便签框（比卡片深） */
-  --border:      #cad9c0;   /* ④ 边框 */
-  --accent-soft: #b2cb9f;   /* ⑤ 浅绿装饰：图标圆环、卡片淡底 */
-  --accent:      #6fa860;   /* ⑥ 主绿：强调、聚焦、链接 */
-  --accent-deep: #557f4f;   /* ⑦ 按钮 / 图标块（深一档） */
+  --sidebar-bg:  #e2ebda;   /* 侧栏底色，比背景深一档，分出左列 */
+  --card:        #e7efe2;   /* 通用表面 / 聚焦态 */
+  --surface-2:   #dbe5d3;   /* ② 输入框、待办项、便签框 */
+  --border:      #cad9c0;   /* ③ 边框 */
+  --accent-soft: #b2cb9f;   /* ④ 浅绿装饰：图标圆环、点阵 */
+  --accent:      #6fa860;   /* ⑤ 主绿：强调、聚焦 */
+  --accent-deep: #557f4f;   /* ⑥ 按钮 / 图标块（深一档） */
   --text:        #3a543c;   /* 正文 */
-  --text-strong: #274027;   /* ⑧ 最深：标题、强调文字 */
-  --muted:       #7e947f;   /* 辅助说明文字 */
+  --text-strong: #274027;   /* ⑦ 最深：标题、强调文字 */
+  --muted:       #7e947f;   /* 辅助说明 */
   --on-accent:   #eef4ea;   /* 深绿按钮上的浅字 */
-  --chip:        #557f4f;   /* 图标块用深绿，制造卡片内层次 */
+  --chip:        #557f4f;   /* 导航图标块用深绿，制造层次 */
 
   --radius: 22px;
   --radius-sm: 14px;
-  --shadow: 0 10px 30px rgba(40, 70, 50, .09);
-  --shadow-sm: 0 3px 12px rgba(40, 70, 50, .07);
+  --shadow: 0 10px 30px rgba(40, 70, 50, .08);
+  --shadow-sm: 0 3px 12px rgba(40, 70, 50, .06);
 }
 
 html[data-theme="dark"] {
-  /* 暗色同样按明度均匀递减（L 由浅到深） */
-  --bg:          #16201a;   /* ① */
-  --card:        #1b271f;   /* ② */
-  --surface:     #20302a;   /* 通用表面 */
-  --surface-2:   #26382f;   /* ③ 输入框/框 */
-  --border:      #314538;   /* ④ */
-  --accent-soft: #3a5444;   /* ⑤ */
-  --accent:      #82c08c;   /* ⑥ 主绿（暗底上提亮） */
-  --accent-deep: #a9d8b6;   /* ⑦ 按钮（暗底用浅绿实底） */
+  --bg:          #16201a;
+  --sidebar-bg:  #1a261f;
+  --card:        #20302a;
+  --surface-2:   #26382f;
+  --border:      #314538;
+  --accent-soft: #3a5444;
+  --accent:      #82c08c;
+  --accent-deep: #a9d8b6;
   --text:        #c4d6cb;
-  --text-strong: #eaf3ec;   /* ⑧ 最深文字（最亮） */
+  --text-strong: #eaf3ec;
   --muted:       #7e9586;
   --on-accent:   #16201a;
   --chip:        #a9d8b6;
@@ -62,167 +55,125 @@ body {
   letter-spacing: .2px;
 }
 
-/* 整体容器：手机宽度，桌面端居中如手机 */
+/* ===== 整体：左侧栏 + 右侧内容，横向铺满 ===== */
 #app {
-  max-width: 480px;
-  margin: 0 auto;
-  min-height: 100dvh;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100dvh;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+/* ---------- 左侧导航列 ---------- */
+#sidebar {
+  flex: 0 0 260px;
+  width: 260px;
+  height: 100dvh;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  background: var(--bg);
-  position: relative;
-  overflow: hidden;
-  box-shadow: 0 0 50px rgba(40, 70, 50, .05);
+  padding: calc(env(safe-area-inset-top) + 18px) 12px 16px;
+  gap: 8px;
 }
-
-/* 顶部柔光，淡淡的同色调氛围 */
-#app::before {
-  content: "";
-  position: absolute;
-  top: -120px; left: 50%;
-  width: 360px; height: 360px;
-  transform: translateX(-50%);
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%);
-  pointer-events: none;
-}
-
-#app-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+#side-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: calc(env(safe-area-inset-top) + 14px) 18px 14px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
-  backdrop-filter: saturate(160%) blur(14px);
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  justify-content: space-between;
+  padding: 2px 10px 14px;
 }
-#app-title {
-  font-size: 18px;
+#side-title {
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 1px;
   margin: 0;
-  flex: 1;
   color: var(--text-strong);
 }
+#side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 2px;
+}
+#side-foot {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+/* 导航项：图标 + 名称，左侧单独成列 */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s ease, color .15s ease;
+}
+.nav-icon {
+  width: 38px; height: 38px;
+  flex: none;
+  border-radius: 11px;
+  display: grid; place-items: center;
+  font-size: 20px;
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-deep) 30%, transparent);
+}
+.nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-item:hover { background: color-mix(in srgb, var(--accent-deep) 8%, transparent); }
+.nav-item:active { background: color-mix(in srgb, var(--accent-deep) 12%, transparent); }
+.nav-item.active {
+  background: color-mix(in srgb, var(--accent-deep) 16%, transparent);
+  color: var(--text-strong);
+}
+.nav-item.active .nav-icon { background: var(--accent-deep); }
+.nav-add { color: var(--muted); }
+.nav-add .nav-icon { background: transparent; box-shadow: none; color: var(--muted); font-size: 22px; }
+.nav-add:hover, .nav-add:active { background: color-mix(in srgb, var(--muted) 12%, transparent); color: var(--text); }
 
 .icon-btn {
   border: none;
   background: transparent;
   color: var(--text);
-  font-size: 20px;
-  width: 40px;
-  height: 40px;
+  font-size: 19px;
+  width: 38px; height: 38px;
   border-radius: 12px;
-  display: grid;
-  place-items: center;
+  display: grid; place-items: center;
   cursor: pointer;
   transition: background .15s ease;
 }
 .icon-btn:active { background: color-mix(in srgb, var(--text) 10%, transparent); }
 
+/* ---------- 右侧内容区 ---------- */
 #view {
+  flex: 1 1 auto;
   position: relative;
-  flex: 1;
-  padding: 20px 18px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  padding: 30px 32px 48px;
+  background: var(--bg);
 }
-
-#app-footer {
-  padding: 12px 16px calc(env(safe-area-inset-bottom) + 14px);
-  text-align: center;
-  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+#view.home-view {
+  background:
+    radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+    var(--bg);
 }
-.hint { color: var(--muted); font-size: 11px; letter-spacing: 1px; margin: 0; }
-
-/* ---------- 首页功能网格 ---------- */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-}
-.card {
-  --accent: #6fa860;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  align-items: flex-start;
-  text-align: left;
-  padding: 20px 18px;
-  min-height: 116px;
-  border-radius: var(--radius);
-  /* ② 卡片：比背景深一档的浅绿面板 */
-  background: var(--card);
-  /* ④ 边框用相邻深一档的绿，制造清晰边界 */
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  color: var(--text);
-  transition: transform .14s ease, box-shadow .14s ease, background .2s ease;
-  position: relative;
-  overflow: hidden;
-}
-/* 卡片右下角同色系柔光（⑤ 浅绿装饰档） */
-.card::after {
-  content: "";
-  position: absolute;
-  right: -30px; bottom: -30px;
-  width: 90px; height: 90px;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%);
-  pointer-events: none;
-}
-.card:active { transform: scale(.96); box-shadow: var(--shadow); }
-.card-icon {
-  width: 50px;
-  height: 50px;
-  border-radius: 16px;
-  display: grid;
-  place-items: center;
-  font-size: 24px;
-  /* ⑦ 图标块用深绿，成为卡片内最深元素，拉出卡片内层次 */
-  background: var(--chip);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-deep) 30%, transparent);
-}
-.card-title {
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--text-strong);
-  letter-spacing: .5px;
-}
-/* 简洁为主：首页卡片不显示描述文字 */
-.card-desc { display: none; }
-
-.card-add {
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  --accent: #6fa860;
-  background: transparent;
-  border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent);
-  box-shadow: none;
-}
-.card-add::after { display: none; }
-.card-add .card-icon {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  color: var(--muted);
-  width: auto; height: auto;
-  font-size: 30px;
-}
-.card-add .card-title { color: var(--muted); font-weight: 600; font-size: 13px; letter-spacing: 2px; }
-
-/* ---------- 功能页：同色系氛围 ---------- */
 #view.feature-view {
   background:
     radial-gradient(120% 60% at 50% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 62%),
     var(--bg);
 }
-/* 同色系细点阵（⑤ 浅绿装饰档） */
 #view.feature-view::before {
   content: "";
   position: absolute;
@@ -232,36 +183,43 @@ body {
   opacity: .10;
   pointer-events: none;
 }
-
-.feature { animation: fade .28s ease; position: relative; z-index: 1; }
+.feature { max-width: 680px; margin: 0 auto; animation: fade .28s ease; position: relative; z-index: 1; }
 @keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-/* 功能页头图：emoji 落在浅绿圆环里（⑤ 装饰档） */
-.hero { text-align: center; padding: 30px 8px 22px; }
+/* 欢迎页（默认） */
+.welcome { text-align: center; padding: 8vh 12px 0; }
+.welcome-emoji {
+  width: 96px; height: 96px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 44px;
+  background: var(--accent-soft);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--accent) 18%, transparent),
+              inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.welcome h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 2px; color: var(--text-strong); }
+.welcome p { color: var(--muted); font-size: 13px; letter-spacing: 1px; margin-top: 10px; }
+
+/* 功能页头图：emoji 落在浅绿圆环里 */
+.hero { text-align: center; padding: 6px 8px 22px; }
 .hero-emoji {
   width: 92px; height: 92px;
   margin: 0 auto 16px;
   border-radius: 50%;
-  display: grid;
-  place-items: center;
+  display: grid; place-items: center;
   font-size: 42px;
   background: var(--accent-soft);
   box-shadow: 0 14px 34px color-mix(in srgb, var(--accent) 18%, transparent),
               inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
-.hero h2 {
-  margin: 0;
-  font-size: 23px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--text-strong);
-}
+.hero h2 { margin: 0; font-size: 23px; font-weight: 700; letter-spacing: 2px; color: var(--text-strong); }
 .hero p { color: var(--muted); line-height: 1.7; font-size: 13px; margin: 10px 0 0; }
 
 .muted { color: var(--muted); font-size: 13px; letter-spacing: .5px; }
 code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-size: 12px; color: var(--text); }
 
-/* 按钮：深绿实底 + 浅字（⑦ 档），比卡片/输入框深，但比标题浅 */
+/* 按钮：深绿实底 + 浅字 */
 .btn {
   border: none;
   background: var(--accent-deep);
@@ -283,7 +241,6 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   flex: 1;
   padding: 13px 15px;
   border-radius: var(--radius-sm);
-  /* ③ 输入框比卡片深一档 */
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--text);
@@ -293,7 +250,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .todo-form input::placeholder { color: var(--muted); }
 .todo-form input:focus {
   outline: none;
-  background: var(--surface);
+  background: var(--card);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
@@ -302,7 +259,6 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* ③ 待办项同输入框一档 */
   background: var(--surface-2);
   border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
   border-radius: var(--radius-sm);
@@ -314,24 +270,18 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .todo-item span { font-size: 15px; color: var(--text); }
 .todo-item.done span { text-decoration: line-through; color: var(--muted); }
 .todo-item .del {
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-size: 16px;
-  cursor: pointer;
-  width: 30px; height: 30px;
-  border-radius: 9px;
+  border: none; background: transparent; color: var(--muted);
+  font-size: 16px; cursor: pointer; width: 30px; height: 30px; border-radius: 9px;
   transition: background .15s ease, color .15s ease;
 }
 .todo-item .del:active { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); color: var(--text); }
 
-/* ---------- 随手记（绿色深浅层次） ---------- */
+/* ---------- 随手记 ---------- */
 .notes-area {
   width: 100%;
-  min-height: 52vh;
+  min-height: 56vh;
   padding: 16px;
   border-radius: var(--radius);
-  /* ③ 便签框与输入框同档 */
   border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
   background: var(--surface-2);
   color: var(--text);
@@ -344,7 +294,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .notes-area::placeholder { color: var(--muted); }
 .notes-area:focus {
   outline: none;
-  background: var(--surface);
+  background: var(--card);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
@@ -358,7 +308,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   bottom: calc(env(safe-area-inset-bottom) + 26px);
   transform: translateX(-50%) translateY(20px);
   background: color-mix(in srgb, var(--text-strong) 92%, transparent);
-  color: var(--surface);
+  color: var(--bg);
   padding: 13px 20px;
   border-radius: 16px;
   font-size: 13px;
@@ -373,3 +323,39 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
 }
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============================================================
+   响应式：窄屏（手机）下，左侧导航收窄成图标栏，内容占满
+   ============================================================ */
+@media (max-width: 768px) {
+  #sidebar {
+    flex: 0 0 78px;
+    width: 78px;
+    padding: calc(env(safe-area-inset-top) + 14px) 8px 14px;
+    align-items: center;
+  }
+  #side-head {
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 0 12px;
+  }
+  #side-title { display: none; }
+  #side-nav { width: 100%; align-items: center; }
+  #side-foot { width: 100%; }
+  .nav-item {
+    justify-content: center;
+    gap: 0;
+    padding: 10px 0;
+  }
+  .nav-label { display: none; }
+  .nav-icon { width: 44px; height: 44px; font-size: 22px; }
+
+  #view { padding: 22px 16px 36px; }
+  .feature { max-width: 100%; }
+  .welcome { padding-top: 4vh; }
+}
+
+/* 超宽屏：内容区不要拉太开 */
+@media (min-width: 1100px) {
+  .feature { max-width: 760px; }
+}
