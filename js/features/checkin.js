@@ -216,6 +216,7 @@ App.registerFeature({
           '</p>';
       } else {
         // 只有今天：直接显示可点击的小任务方框（不再显示日期/名称/进度，顶部 habit 列表已有）
+        const done = arr.filter(Boolean).length;
         const allDone = done === h.parts;
         html += '<div class="ci-parts' + (allDone ? ' all-done' : '') + '">';
         const labels = (h.labels && h.labels.length === h.parts)
