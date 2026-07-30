@@ -7,7 +7,7 @@ App.registerFeature({
   title: '随手记',
   desc: '自动保存的便签',
   icon: '📝',
-  color: '#c39b8c',
+  color: '#8b9e84',
   render(container) {
     const KEY = 'myapp.notes';
     const saved = localStorage.getItem(KEY) || '';

@@ -4,8 +4,8 @@
   "description": "可自由添加功能的手机网页应用",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#e9e5de",
-  "theme_color": "#e9e5de",
+  "background_color": "#e9ebe4",
+  "theme_color": "#97a98c",
   "icons": [
     { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }

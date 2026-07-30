@@ -6,21 +6,21 @@
    ============================================================ */
 
 :root {
-  --bg: #e9e5de;
-  --surface: #f5f2ec;
-  --surface-2: #efeae2;
-  --text: #514c44;
-  --text-strong: #38332d;
-  --muted: #a59d90;
-  --border: #ddd6ca;
+  --bg: #e9ebe4;
+  --surface: #f4f6f1;
+  --surface-2: #eef1ea;
+  --text: #4a4f44;
+  --text-strong: #33382f;
+  --muted: #9aa090;
+  --border: #d6dccb;
 
   --radius: 22px;
   --radius-sm: 14px;
   --shadow: 0 10px 30px rgba(74, 66, 56, .10);
   --shadow-sm: 0 3px 12px rgba(74, 66, 56, .08);
 
-  /* 默认主色（中性莫兰迪灰），功能页会按功能覆盖 */
-  --accent: #9aa7ad;
+  /* 默认主色（莫兰迪绿），功能页会按功能覆盖 */
+  --accent: #97a98c;
   --accent-soft: color-mix(in srgb, var(--accent) 15%, var(--surface));
   --accent-faint: color-mix(in srgb, var(--accent) 9%, var(--surface));
   --accent-deep: color-mix(in srgb, var(--accent) 64%, #2a2620);
@@ -28,13 +28,13 @@
 }
 
 html[data-theme="dark"] {
-  --bg: #2a2723;
-  --surface: #34302b;
-  --surface-2: #3b362f;
-  --text: #e7e1d6;
-  --text-strong: #f3eee4;
-  --muted: #9b9387;
-  --border: #453f37;
+  --bg: #252a25;
+  --surface: #2e332e;
+  --surface-2: #343a34;
+  --text: #e3e8df;
+  --text-strong: #f0f4ec;
+  --muted: #98a090;
+  --border: #3e443e;
 
   --shadow: 0 10px 30px rgba(0, 0, 0, .38);
   --shadow-sm: 0 3px 12px rgba(0, 0, 0, .3);
@@ -138,7 +138,7 @@ body {
   gap: 16px;
 }
 .card {
-  --accent: #9aa7ad;
+  --accent: #97a98c;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -190,7 +190,7 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  --accent: #ada69b;
+  --accent: #9aa890;
   background: transparent;
   border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent);
   box-shadow: none;
