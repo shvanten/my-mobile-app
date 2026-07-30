@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <!-- 手机专用：禁止缩放、适配刘海屏 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="assets/icon.svg" />
+  <link rel="apple-touch-icon" href="assets/icon.svg" />
+  <title>我的手机应用</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="app-header">
+      <button id="back-btn" class="icon-btn" aria-label="返回" hidden>‹</button>
+      <h1 id="app-title">我的应用</h1>
+      <button id="theme-btn" class="icon-btn" aria-label="切换主题">🌙</button>
+    </header>
+    <main id="view"></main>
+    <footer id="app-footer">
+      <p class="hint">轻触卡片打开功能 · 点「➕ 添加功能」看如何扩展</p>
+    </footer>
+  </div>
+
+  <!-- 1) 先加载核心框架 -->
+  <script src="js/app.js"></script>
+  <!-- 2) 再加载各个功能模块（新增功能就在这里加一行） -->
+  <script src="js/features/hello.js"></script>
+  <script src="js/features/todo.js"></script>
+  <script src="js/features/notes.js"></script>
+</body>
+</html>
