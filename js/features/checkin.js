@@ -215,21 +215,28 @@ App.registerFeature({
           (isPast(ds) ? '悟已往之不谏，知来者之可追。' : '尚未到来。') +
           '</p>';
       } else {
-        // 只有今天：直接显示可点击的小任务方框（不再显示日期/名称/进度，顶部 habit 列表已有）
+        // 只有今天：默认显示可点击的小任务方框；全部完成后整块变成深绿圆按钮（不再显示方框）
         const done = arr.filter(Boolean).length;
         const allDone = done === h.parts;
-        html += '<div class="ci-parts' + (allDone ? ' all-done' : '') + '">';
-        const labels = (h.labels && h.labels.length === h.parts)
-          ? h.labels
-          : arr.map((_, i) => '第' + (i + 1) + '份');
-        arr.forEach((on, i) => {
-          html += '<div class="ci-part-wrap">' +
-            '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '">' +
-            '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
-            '</button>' +
+        if (allDone) {
+          // 全部完成：圆形按钮 + ✓ 标记；子任务方框在 CSS 里 display:none
+          html += '<div class="ci-parts all-done" role="button" tabindex="0" aria-label="今日已完成，点击取消">' +
+            '<span class="ci-done-mark">✓</span>' +
             '</div>';
-        });
-        html += '</div>';
+        } else {
+          html += '<div class="ci-parts">';
+          const labels = (h.labels && h.labels.length === h.parts)
+            ? h.labels
+            : arr.map((_, i) => '第' + (i + 1) + '份');
+          arr.forEach((on, i) => {
+            html += '<div class="ci-part-wrap">' +
+              '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '">' +
+              '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
+              '</button>' +
+              '</div>';
+          });
+          html += '</div>';
+        }
       }
       detailEl.innerHTML = html;
     }
@@ -270,6 +277,19 @@ App.registerFeature({
     });
 
     detailEl.addEventListener('click', (e) => {
+      // 全部完成的圆形按钮：点击取消今天的全勤
+      const allDoneEl = e.target.closest('.ci-parts.all-done');
+      if (allDoneEl) {
+        const h = selHabit();
+        if (!h || selDate !== todayStr()) return;
+        const arr = getDayArr(h, selDate);
+        if (!arr.every(Boolean)) return;  // 防御：必须当前确实全完成
+        arr.fill(false);
+        saveRecords();
+        paintCalendar(); paintDetail();
+        App.toast('已取消完成');
+        return;
+      }
       const p = e.target.closest('[data-i]');
       if (!p || p.disabled) return;
       const h = selHabit();
@@ -283,6 +303,15 @@ App.registerFeature({
       if (done === h.parts) paintCalendar();
       paintDetail();
       if (done === h.parts) App.toast('今天「' + h.name + '」全部完成 🎉');
+    });
+
+    // 圆形按钮的键盘支持（tabindex=0 + Enter/Space）
+    detailEl.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target.closest('.ci-parts.all-done');
+      if (!el) return;
+      e.preventDefault();
+      el.click();
     });
 
     // ---------- 新建打卡 ----------
