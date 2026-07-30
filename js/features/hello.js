@@ -7,7 +7,7 @@ App.registerFeature({
   title: '你好',
   desc: '一个简单的示例页面',
   icon: '👋',
-  color: '#7fae8c',
+  color: '#88bd8f',
   render(container) {
     container.innerHTML =
       '<div class="hero">' +
