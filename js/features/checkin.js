@@ -228,39 +228,61 @@ App.registerFeature({
       const ds = selDate;
       const arr = getDayArr(h, ds);
       const isToday = ds === todayStr();
-      const locked = !isToday;  // 过去和未来都锁定，只有今天可编辑
-      let html = '';
+      const locked = !isToday;
+      const done = arr.filter(Boolean).length;
+      const allDone = !locked && done === h.parts;
+      const confirmed = isDayDone(h, ds);
 
+      // 优化：若现有 DOM 已是 .all-done 圆按钮、且新状态仍为 allDone，
+      // 仅在 pending ↔ confirmed 之间切 `.confirmed`（不再触发 morph 动画重跑）
+      const existingAllDoneEl = detailEl.querySelector('.ci-parts.all-done');
+      if (existingAllDoneEl && allDone) {
+        const wasConfirmed = existingAllDoneEl.classList.contains('confirmed');
+        if (wasConfirmed !== confirmed) {
+          existingAllDoneEl.classList.toggle('confirmed', confirmed);
+          existingAllDoneEl.setAttribute('aria-label',
+            confirmed ? '今日已完成，点击取消' : '小任务已全部完成，点击确认打卡');
+        }
+        return;
+      }
+
+      let html = '';
       if (locked) {
-        // 锁定日期：只显示一句提示，不展示小任务方框
         html += '<p class="ci-locked">' +
           (isPast(ds) ? '悟已往之不谏，知来者之可追。' : '尚未到来。') +
           '</p>';
-      } else {
-        // 只有今天：默认显示可点击的小任务方框；全部点亮后出现圆形「确认按钮」
-        const done = arr.filter(Boolean).length;
-        const allDone = done === h.parts;
-        if (allDone) {
-          // 全部点亮：先显示浅色「待确认」按钮；按下才变深并加深日历
-          const confirmed = isDayDone(h, ds);
-          html += '<div class="ci-parts all-done' + (confirmed ? ' confirmed' : '') + '" role="button" tabindex="0" ' +
-            'aria-label="' + (confirmed ? '今日已完成，点击取消' : '小任务已全部完成，点击确认打卡') + '">' +
-            '<span class="ci-done-mark">✓</span>' +
+      } else if (allDone) {
+        // 全部点亮 → 触发 ci-morph 动画：
+        //   - 同时渲染小任务方框（顶层 ci-fade-out 把它淡出）
+        //   - 同时渲染 ✓ 标记（顶层 ci-check-pop 延迟弹出）
+        const labels = (h.labels && h.labels.length === h.parts)
+          ? h.labels
+          : arr.map((_, i) => '第' + (i + 1) + '份');
+        html += '<div class="ci-parts all-done' + (confirmed ? ' confirmed' : '') + '" ' +
+          'role="button" tabindex="0" ' +
+          'aria-label="' + (confirmed ? '今日已完成，点击取消' : '小任务已全部完成，点击确认打卡') + '">';
+        arr.forEach((on, i) => {
+          html += '<div class="ci-part-wrap">' +
+            '<button class="ci-part on" type="button" disabled tabindex="-1">' +
+            '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
+            '</button>' +
             '</div>';
-        } else {
-          html += '<div class="ci-parts">';
-          const labels = (h.labels && h.labels.length === h.parts)
-            ? h.labels
-            : arr.map((_, i) => '第' + (i + 1) + '份');
-          arr.forEach((on, i) => {
-            html += '<div class="ci-part-wrap">' +
-              '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '">' +
-              '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
-              '</button>' +
-              '</div>';
-          });
-          html += '</div>';
-        }
+        });
+        html += '<span class="ci-done-mark">✓</span>';
+        html += '</div>';
+      } else {
+        html += '<div class="ci-parts">';
+        const labels = (h.labels && h.labels.length === h.parts)
+          ? h.labels
+          : arr.map((_, i) => '第' + (i + 1) + '份');
+        arr.forEach((on, i) => {
+          html += '<div class="ci-part-wrap">' +
+            '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '">' +
+            '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
+            '</button>' +
+            '</div>';
+        });
+        html += '</div>';
       }
       detailEl.innerHTML = html;
     }
@@ -309,14 +331,20 @@ App.registerFeature({
         const entry = getEntry(h, selDate);
         if (!entry) return;
         if (entry.done) {
-          entry.done = false;       // 取消确认：按钮回浅色，日历回浅
+          // 取消：清空所有小任务回到"未点亮"状态（测试便利、可一键重做）
+          entry.done = false;
+          entry.parts.fill(false);
           saveRecords();
-          paintCalendar(); paintDetail();
-          App.toast('已取消完成');
+          paintCalendar();
+          paintDetail();   // 回到带方框（未点亮）的初始态
+          App.toast('已重置今日打卡');
         } else {
-          entry.done = true;        // 确认：按钮变深 + 对应日期颜色变深
+          // 确认：仅切 .confirmed class + 日历变深，不重跑 morph 动画
+          entry.done = true;
           saveRecords();
-          paintCalendar(); paintDetail();
+          paintCalendar();
+          allDoneEl.classList.add('confirmed');
+          allDoneEl.setAttribute('aria-label', '今日已完成，点击取消');
           App.toast('已完成打卡 ✓');
         }
         return;

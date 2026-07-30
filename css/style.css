@@ -445,43 +445,102 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: background .3s ease, border-radius .3s ease,
-    box-shadow .3s ease, border-color .3s ease, padding .3s ease;
+  transition: background .35s ease, border-color .35s ease, box-shadow .35s ease;
 }
-/* 全部完成：变成直径比小任务框（60px）略大的圆形按钮（84px）。
-   - 未确认(pending)：浅色（accent-soft 底 + 深绿描边 + 深绿勾）
-   - 已确认(confirmed)：深色（accent-deep 底 + 浅色勾）；同时日历上该日期变深 */
+/* 全部完成后：从小任务条 → 圆角正方形 → 圆形按钮 的 morph 动画。
+   最终态：84px 圆；pending 为浅色，confirmed 加 .confirmed 类切换为深色
+   （仅色彩/阴影过渡，不再跑 morph）。 */
 .ci-parts.all-done {
-  width: 84px;
-  height: 84px;
-  min-height: 0;
-  padding: 0;
-  border-radius: 50%;
-  margin: 0 auto;
-  background: var(--accent-soft);
-  border-color: var(--accent-deep);
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-deep) 18%, transparent);
-  display: grid;
-  place-items: center;
   cursor: pointer;
   user-select: none;
-  transition: background .3s ease, box-shadow .3s ease, border-color .3s ease, transform .1s ease;
+  margin: 0 auto;
+  animation: ci-morph .9s cubic-bezier(.45, 0, .25, 1) forwards;
 }
 .ci-parts.all-done.confirmed {
   background: var(--accent-deep);
   border-color: transparent;
   box-shadow: 0 12px 30px color-mix(in srgb, var(--accent-deep) 32%, transparent);
+  transition: background .25s ease, border-color .25s ease, box-shadow .25s ease;
 }
 .ci-parts.all-done:active { transform: scale(.96); }
+/* morph 关键帧：
+   - 0% 大框 + 小任务排列（与默认态一致）
+   - 35% 大框收成竖长方形（高度 ≈ 圆按钮直径）；小任务此刻已淡出
+   - 70% 已是 84×84 的圆角正方形（accent-soft 底）
+   - 100% border-radius 收成 50% 成为圆形 */
+@keyframes ci-morph {
+  0% {
+    width: 100%;
+    height: 92px;
+    padding: 16px 14px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: none;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+  }
+  35% {
+    width: 168px;
+    height: 84px;
+    padding: 8px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  70% {
+    width: 84px;
+    height: 84px;
+    padding: 0;
+    border-radius: 18px;
+    background: var(--accent-soft);
+    border-color: var(--accent-deep);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-deep) 16%, transparent);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  100% {
+    width: 84px;
+    height: 84px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    border-color: var(--accent-deep);
+    box-shadow: 0 8px 22px color-mix(in srgb, var(--accent-deep) 18%, transparent);
+    display: grid;
+    place-items: center;
+  }
+}
+/* morph 时小任务方框淡出（在 morph 头 0.3s 内完成） */
+.ci-parts.all-done .ci-part-wrap {
+  animation: ci-fade-out .3s ease forwards;
+}
+@keyframes ci-fade-out {
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(.5); }
+}
+/* ✓ 标记在 morph 末尾弹出 */
 .ci-done-mark {
   font-size: 40px;
   font-weight: 300;
   line-height: 1;
   color: var(--accent-deep);
+  opacity: 0;
+  transform: scale(.3);
+  animation: ci-check-pop .5s cubic-bezier(.34, 1.56, .64, 1) .55s forwards;
 }
 .ci-parts.all-done.confirmed .ci-done-mark { color: var(--on-accent); }
-/* 全部完成：隐藏内部小任务方框；圆就是按钮本身（带 ✓ 标记） */
-.ci-parts.all-done .ci-part-wrap { display: none; }
+@keyframes ci-check-pop {
+  0%   { opacity: 0; transform: scale(.3); }
+  60%  { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
 .ci-part-wrap { display: flex; align-items: center; justify-content: center; flex: 0 1 auto; }
 .ci-part {
   width: 60px; height: 60px; border-radius: 14px;
@@ -494,6 +553,9 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   transition: background .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, transform .1s ease;
 }
 .ci-part:active { transform: scale(.94); }
+/* morph 状态下小任务方框要可被点透（点击落在 .ci-parts 圆按钮上） */
+.ci-parts.all-done .ci-part,
+.ci-parts.all-done .ci-part-wrap { pointer-events: none; }
 .ci-part-text {
   font-size: 13px; line-height: 1.2;
   text-align: center;
