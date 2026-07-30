@@ -152,8 +152,13 @@
       b.type = 'button';
       b.textContent = a.text;
       b.addEventListener('click', () => {
-        if (a.onClick) a.onClick();
+        // 先关弹层（即使后续用户回调抛错，弹层也不卡住）
         if (a.close !== false) closeModal();
+        // 再执行用户回调，加 try/catch 防御
+        if (a.onClick) {
+          try { a.onClick(); }
+          catch (e) { console.error('[App.modal]', e); toast('操作失败，请重试'); }
+        }
       });
       actionsEl.appendChild(b);
     });

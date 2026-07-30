@@ -1706,3 +1706,270 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .mo-pie-c { color: var(--text-strong); font-weight: 600; font-size: 12px; }
 .mo-pie-p { color: var(--accent-deep); font-size: 12px; min-width: 36px; text-align: right; }
 [data-theme="dark"] .mo-pie-p { color: var(--accent-soft); }
+/* ============================================================
+   小说拆文 v2：书模型（书架 + 翻书动画 + 详情）
+   ============================================================ */
+.nb-h { margin: 6px 0 4px; font-size: 12px; }
+.nb-type { display: flex; gap: 8px; }
+.nb-type-btn {
+  flex: 1; padding: 10px 0; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; cursor: pointer;
+}
+.nb-type-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.nb-emojis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.nb-emoji {
+  border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px;
+  font-size: 22px; line-height: 1; padding: 6px 0; cursor: pointer;
+}
+.nb-emoji.on { background: var(--accent); border-color: var(--accent); }
+
+/* 长文本编辑弹层（核心梗/人设/分析条目/摘抄条目）的 textarea */
+.nn-sheet textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text); padding: 10px 12px;
+  font: inherit; font-size: 14px; line-height: 1.7; resize: vertical;
+}
+.nn-sheet textarea:focus { outline: none; border-color: var(--accent); }
+
+/* ---------- 书架（grid） ---------- */
+.nn-shelf { columns: 2; column-gap: 12px; padding: 4px 4px 80px; }
+@media (min-width: 700px) { .nn-shelf { columns: 3; } }
+.nn-shelf-empty {
+  text-align: center; padding: 40px 20px;
+}
+.nn-shelf-empty .nn-shelf-emoji { font-size: 64px; line-height: 1; margin-bottom: 12px; }
+
+/* ---------- 书本卡片 + 翻书动画 ---------- */
+.nn-book {
+  break-inside: avoid;
+  margin-bottom: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.nn-book-meta {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--muted); padding: 6px 4px 0;
+}
+
+.nn-book-cover {
+  position: relative;
+  width: 100%; aspect-ratio: 3 / 4;
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+.nn-book-inner { display: none; }   /* 预留 */
+.nn-book-spine {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 6px;
+  border-radius: 4px 0 0 4px;
+  background: linear-gradient(90deg, rgba(0,0,0,.18), rgba(0,0,0,0));
+  z-index: 2;
+}
+.nn-book-front,
+.nn-book-back {
+  position: absolute; inset: 0;
+  border-radius: 4px 12px 12px 4px;
+  backface-visibility: hidden;
+  overflow: hidden;
+}
+.nn-book-front {
+  background: linear-gradient(155deg, var(--accent-soft), color-mix(in srgb, var(--accent) 30%, var(--accent-soft)));
+  color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 14px 8px;
+  box-shadow: 0 4px 12px rgba(40,60,40,.18), 0 12px 24px rgba(40,60,40,.10);
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  transition: transform .55s cubic-bezier(.4, 0, .2, 1),
+              box-shadow .55s ease;
+}
+.nn-book-back {
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 60%, #fff),
+                                  color-mix(in srgb, var(--accent-deep) 70%, #fff));
+  transform: rotateY(180deg);
+  border-radius: 4px 12px 12px 4px;
+}
+.nn-book-emoji { font-size: 56px; line-height: 1; text-shadow: 0 2px 6px rgba(0,0,0,.18); }
+.nn-book-title {
+  font-size: 14px; font-weight: 800; line-height: 1.25; text-align: center;
+  max-width: 90%; word-break: break-word;
+  text-shadow: 0 1px 2px rgba(0,0,0,.18);
+}
+.nn-book-type {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  background: rgba(255, 255, 255, .25);
+  backdrop-filter: blur(2px);
+}
+.nn-book-type-long { background: rgba(255, 255, 255, .28); }
+.nn-book-type-short { background: rgba(255, 255, 255, .25); }
+
+/* 翻书动画：cover 上的 front 旋转 180deg，从左边缘翻开 */
+.nn-book.opening .nn-book-front {
+  transform: rotateY(-178deg);
+  box-shadow: -30px 0 40px rgba(0, 0, 0, .25);
+}
+
+/* ---------- 书页详情 ---------- */
+.nn-page { padding: 4px 2px 80px; animation: np-fade-in .4s ease; }
+@keyframes np-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.nn-page-bar { padding: 4px 4px 8px; }
+.nn-back-btn { padding: 5px 12px; }
+
+.nn-page-head {
+  display: grid; grid-template-columns: auto 1fr auto;
+  gap: 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; margin-bottom: 14px;
+}
+.nn-page-emoji {
+  font-size: 44px; line-height: 1; padding: 6px;
+  background: linear-gradient(155deg, var(--accent-soft), color-mix(in srgb, var(--accent) 25%, var(--accent-soft)));
+  border-radius: 12px; min-width: 56px; text-align: center;
+}
+.nn-page-titles h2 {
+  margin: 0 0 4px; font-size: 18px; color: var(--text-strong);
+  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.nn-page-titles h2 .nn-book-type { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-deep); }
+[data-theme="dark"] .nn-page-titles h2 .nn-book-type { color: var(--accent-soft); }
+.nn-page-tagline { margin: 0; font-size: 13px; line-height: 1.5; }
+.nn-page-actions { display: flex; flex-direction: column; gap: 6px; }
+
+.nn-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px;
+}
+.nn-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.nn-section-head h3 { margin: 0; font-size: 14px; color: var(--text-strong); }
+.nn-section-body { font-size: 14px; line-height: 1.65; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.nn-section-body .nn-text { white-space: pre-wrap; word-break: break-word; }
+.nn-empty-inline { font-size: 13px; padding: 4px 0 0; margin: 0; }
+.nn-section-list { display: flex; flex-direction: column; gap: 8px; }
+
+.nn-item {
+  position: relative;
+  background: var(--surface-2); border-radius: 10px; padding: 10px 12px;
+  font-size: 14px; line-height: 1.7; color: var(--text);
+}
+.nn-item-text { white-space: pre-wrap; word-break: break-word; padding-right: 56px; }
+.nn-item-ops {
+  position: absolute; right: 8px; top: 8px;
+  display: flex; gap: 2px;
+}
+.nn-item-ops .nn-op {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 14px; padding: 4px 6px; border-radius: 6px; line-height: 1;
+  color: var(--muted);
+}
+.nn-item-ops .nn-op:active { background: rgba(0,0,0,.08); }
+
+/* ============================================================
+   小说拆文 v2：书模型（书架 + 翻书动画 + 详情）
+   ============================================================ */
+.nb-h { margin: 6px 0 4px; font-size: 12px; }
+.nb-type { display: flex; gap: 8px; }
+.nb-type-btn {
+  flex: 1; padding: 10px 0; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-2); color: var(--text); font: inherit; font-size: 14px; cursor: pointer;
+}
+.nb-type-btn.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.nb-emojis { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.nb-emoji {
+  border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px;
+  font-size: 22px; line-height: 1; padding: 6px 0; cursor: pointer;
+}
+.nb-emoji.on { background: var(--accent); border-color: var(--accent); }
+
+/* 长文本编辑弹层（核心梗/人设/分析条目/摘抄条目）的 textarea */
+.nn-sheet textarea {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text); padding: 10px 12px;
+  font: inherit; font-size: 14px; line-height: 1.7; resize: vertical;
+}
+.nn-sheet textarea:focus { outline: none; border-color: var(--accent); }
+
+/* ---------- 书架（grid） ---------- */
+.nn-shelf { columns: 2; column-gap: 12px; padding: 4px 4px 80px; }
+@media (min-width: 700px) { .nn-shelf { columns: 3; } }
+.nn-shelf-empty {
+  text-align: center; padding: 40px 20px;
+}
+.nn-shelf-empty .nn-shelf-emoji { font-size: 64px; line-height: 1; margin-bottom: 12px; }
+
+/* ---------- 书本卡片 + 翻书动画 ---------- */
+.nn-book {
+  break-inside: avoid;
+  margin-bottom: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.nn-book-meta {
+  display: flex; justify-content: space-between;
+  font-size: 11px; color: var(--muted); padding: 6px 4px 0;
+}
+
+.nn-book-cover {
+  position: relative;
+  width: 100%; aspect-ratio: 3 / 4;
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+/* ---------- 书页详情 ---------- */
+.nn-page { padding: 4px 2px 80px; animation: np-fade-in .4s ease; }
+@keyframes np-fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.nn-page-bar { padding: 4px 4px 8px; }
+.nn-back-btn { padding: 5px 12px; }
+
+.nn-page-head {
+  display: grid; grid-template-columns: auto 1fr auto;
+  gap: 12px; align-items: center;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; margin-bottom: 14px;
+}
+.nn-page-emoji {
+  font-size: 44px; line-height: 1; padding: 6px;
+  background: linear-gradient(155deg, var(--accent-soft), color-mix(in srgb, var(--accent) 25%, var(--accent-soft)));
+  border-radius: 12px; min-width: 56px; text-align: center;
+}
+.nn-page-titles h2 {
+  margin: 0 0 4px; font-size: 18px; color: var(--text-strong);
+  display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.nn-page-titles h2 .nn-book-type { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-deep); }
+[data-theme="dark"] .nn-page-titles h2 .nn-book-type { color: var(--accent-soft); }
+.nn-page-tagline { margin: 0; font-size: 13px; line-height: 1.5; }
+.nn-page-actions { display: flex; flex-direction: column; gap: 6px; }
+
+.nn-section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 12px;
+}
+.nn-section-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.nn-section-head h3 { margin: 0; font-size: 14px; color: var(--text-strong); }
+.nn-section-body { font-size: 14px; line-height: 1.65; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.nn-section-body .nn-text { white-space: pre-wrap; word-break: break-word; }
+.nn-empty-inline { font-size: 13px; padding: 4px 0 0; margin: 0; }
+.nn-section-list { display: flex; flex-direction: column; gap: 8px; }
+
+.nn-item {
+  position: relative;
+  background: var(--surface-2); border-radius: 10px; padding: 10px 12px;
+  font-size: 14px; line-height: 1.7; color: var(--text);
+}
+.nn-item-text { white-space: pre-wrap; word-break: break-word; padding-right: 56px; }
+.nn-item-ops {
+  position: absolute; right: 8px; top: 8px;
+  display: flex; gap: 2px;
+}
+.nn-item-ops .nn-op {
+  border: none; background: transparent; cursor: pointer;
+  font-size: 14px; padding: 4px 6px; border-radius: 6px; line-height: 1;
+  color: var(--muted);
+}
+.nn-item-ops .nn-op:active { background: rgba(0,0,0,.08); }
