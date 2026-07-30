@@ -115,7 +115,11 @@ App.registerFeature({
       try { const d = JSON.parse(localStorage.getItem(KEY)); if (d) return migrate(d); } catch (e) {}
       return { books: [] };
     }
-    function save() { localStorage.setItem(KEY, JSON.stringify(data)); if (window.Sync) Sync.markDirty(); }
+    function save() {
+      localStorage.setItem(KEY, JSON.stringify(data));
+      // markDirty 绝不应影响本地保存结果
+      if (window.Sync) { try { Sync.markDirty(); } catch (e) {} }
+    }
     let data = load();
 
     const uid = (p) => (p || 'x') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -128,6 +132,7 @@ App.registerFeature({
     let view = 'books';           // books | detail | rank | allQuotes | allAnalyses
     let currentBookId = null;
     let suppressPaint = false;
+    let activeTabKey = 'title';   // 记录最后一次停留的分页，重绘后恢复，避免保存后跳回标题
 
     // ---------- 骨架 ----------
     container.innerHTML =
@@ -189,16 +194,17 @@ App.registerFeature({
       bodyEl.innerHTML = '<div class="nn-shelf">' + cards + '</div>';
 
       bodyEl.querySelectorAll('.nn-book').forEach((card) => {
-        card.addEventListener('click', () => {
-          if (card.classList.contains('opening')) return;
-          card.classList.add('opening');
-          const bid = card.dataset.bid;
-          setTimeout(() => {
-            view = 'detail';
-            currentBookId = bid;
-            paint();
-          }, 620);
-        });
+          card.addEventListener('click', () => {
+            if (card.classList.contains('opening')) return;
+            card.classList.add('opening');
+            const bid = card.dataset.bid;
+            setTimeout(() => {
+              view = 'detail';
+              currentBookId = bid;
+              activeTabKey = 'title';
+              paint();
+            }, 620);
+          });
       });
     }
 
@@ -295,11 +301,12 @@ App.registerFeature({
       }
       pagesEl.addEventListener('scroll', () => {
         const i = Math.round(pagesEl.scrollLeft / Math.max(1, pagesEl.clientWidth));
+        if (TABS[i]) activeTabKey = TABS[i].key;
         tabBtns.forEach((bb, idx) => bb.classList.toggle('on', idx === i));
         pagerDots.forEach((d, idx) => d.classList.toggle('on', idx === i));
       });
-      tabBtns.forEach((bb, i) => bb.addEventListener('click', () => goTo(i)));
-      pagerDots.forEach((d) => d.addEventListener('click', () => goTo(+d.dataset.go)));
+      tabBtns.forEach((bb, i) => bb.addEventListener('click', () => { activeTabKey = TABS[i].key; goTo(i); }));
+      pagerDots.forEach((d) => d.addEventListener('click', () => { const i = +d.dataset.go; if (TABS[i]) activeTabKey = TABS[i].key; goTo(i); }));
 
       bodyEl.querySelectorAll('[data-add]').forEach((btn) => {
         btn.addEventListener('click', () => openItemEditor(b, btn.dataset.add, null, paintDetail));
@@ -327,6 +334,17 @@ App.registerFeature({
         });
       });
       bindViewers();
+
+      // 重绘后恢复到上次停留的分页（保存/删除操作后不再跳回标题）
+      const restoreIdx = Math.max(0, TABS.findIndex((t) => t.key === activeTabKey));
+      if (restoreIdx > 0) {
+        setTimeout(() => {
+          const w = pagesEl.clientWidth || 1;
+          pagesEl.scrollLeft = restoreIdx * w;
+          tabBtns.forEach((bb, idx) => bb.classList.toggle('on', idx === restoreIdx));
+          pagerDots.forEach((d, idx) => d.classList.toggle('on', idx === restoreIdx));
+        }, 0);
+      }
     }
 
     // 单条 item 渲染：支持 文字 / 多页手写 / 两者
@@ -478,14 +496,18 @@ App.registerFeature({
         pages: pages,
         onSave: (text, finalPages) => {
           const t = (text || '').trim();
-          const kept = finalPages.filter((p) => (p.strokes && p.strokes.length) || p.img);
+          // 存盘时去掉 undo/redo 历史，减小体积、避免 localStorage 超额
+          const kept = finalPages
+            .filter((p) => (p.strokes && p.strokes.length) || p.img)
+            .map((p) => ({ id: p.id, strokes: p.strokes || [], thumb: p.thumb || '', img: p.img || '' }));
           if (!t && !kept.length) { App.toast('文字和手写不能都为空'); return; }
           if (isNew) {
             (book[field] = book[field] || []).push({ id: uid(key), text: t, drawings: kept, createdAt: Date.now() });
           } else {
             existing.text = t; existing.drawings = kept;
           }
-          save();
+          try { save(); }
+          catch (e) { console.error(e); App.toast('本地保存失败：存储空间可能已满，请删掉一些手写图片'); }
           (onDone || paintDetail)();
           App.toast(isNew ? '已添加' : '已更新');
         },
