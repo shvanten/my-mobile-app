@@ -192,8 +192,8 @@ App.registerFeature({
       const ds = selDate;
       const arr = getDayArr(h, ds);
       const done = arr.filter(Boolean).length;
-      const editable = !isPast(ds);
-      const locked = isPast(ds);
+      const isToday = ds === todayStr();
+      const locked = !isToday;  // 过去和未来都锁定，只有今天可编辑
       const full = done === h.parts;
 
       let html = '<div class="ci-detail-head">' +
@@ -202,31 +202,25 @@ App.registerFeature({
         '<span class="ci-detail-prog">' + done + ' / ' + h.parts + '</span>' +
         '</div>';
       if (locked) {
-        html += '<p class="ci-locked">悟已往之不谏，知来者之可追。</p>';
-      }
-      html += '<div class="ci-parts' + (editable ? '' : ' locked') + '">';
-      const labels = (h.labels && h.labels.length === h.parts)
-        ? h.labels
-        : arr.map((_, i) => '第' + (i + 1) + '份');
-      arr.forEach((on, i) => {
-        if (locked) {
-          // 已锁定日期：纯展示，方框填满（已完成深绿、未完成浅绿），不可点击
+        // 锁定日期：只显示一句提示，不展示小任务方框
+        html += '<p class="ci-locked">' +
+          (isPast(ds) ? '悟已往之不谏，知来者之可追。' : '尚未到来。') +
+          '</p>';
+      } else {
+        // 只有今天渲染可点击的小任务方框
+        html += '<div class="ci-parts">';
+        const labels = (h.labels && h.labels.length === h.parts)
+          ? h.labels
+          : arr.map((_, i) => '第' + (i + 1) + '份');
+        arr.forEach((on, i) => {
           html += '<div class="ci-part-wrap">' +
-            '<div class="ci-part fill' + (on ? ' on' : '') + '">' +
-            '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
-            '</div>' +
-            '</div>';
-        } else {
-          html += '<div class="ci-part-wrap">' +
-            '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '"' +
-            (editable ? '' : ' disabled') + '>' +
+            '<button class="ci-part' + (on ? ' on' : '') + '" type="button" data-i="' + i + '">' +
             '<span class="ci-part-text">' + App.escapeHtml(labels[i] || '') + '</span>' +
             '</button>' +
             '</div>';
-        }
-      });
-      html += '</div>';
-      if (editable && full) html += '<p class="ci-done-tip">✓ 今天已全部完成</p>';
+        });
+        html += '</div>';
+      }
       detailEl.innerHTML = html;
     }
 
@@ -255,8 +249,8 @@ App.registerFeature({
       const ds = day.dataset.date;
       selDate = ds;
       const h = selHabit();
-      // 单份任务：点日历当天即直接切换完成
-      if (h && h.parts === 1 && !isPast(ds)) {
+      // 单份任务：点日历今天即直接切换完成（过去/未来不可点）
+      if (h && h.parts === 1 && ds === todayStr()) {
         const arr = getDayArr(h, ds);
         arr[0] = !arr[0];
         saveRecords();
@@ -269,7 +263,7 @@ App.registerFeature({
       const p = e.target.closest('[data-i]');
       if (!p || p.disabled) return;
       const h = selHabit();
-      if (!h || isPast(selDate)) return;
+      if (!h || selDate !== todayStr()) return;
       const arr = getDayArr(h, selDate);
       const i = +p.dataset.i;
       arr[i] = !arr[i];
