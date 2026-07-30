@@ -163,55 +163,68 @@ App.registerFeature({
       });
     }
 
-    // ---------- 书籍详情 ----------
+    // ---------- 书籍详情（横滑 5 tab：标题 / 导语 / 拆书 / 人设 / 摘抄） ----------
     function paintDetail() {
       const b = getBook(currentBookId);
       if (!b) { view = 'books'; paintBooks(); return; }
       const tint = b.type === 'long' ? 'long' : 'short';
       const analyses = b.analyses || [];
       const quotes = b.quotes || [];
+
       const aHtml = analyses.length
         ? analyses.map((it) => itemRow('a', it)).join('')
-        : '<p class="muted nn-empty-inline">还没有分析，点击下方「＋ 添加」。</p>';
+        : '<p class="muted nn-empty-inline">还没有分析，点下方「＋ 添加」。</p>';
       const qHtml = quotes.length
         ? quotes.map((it) => itemRow('q', it)).join('')
-        : '<p class="muted nn-empty-inline">还没有摘抄，点击下方「＋ 添加」。</p>';
+        : '<p class="muted nn-empty-inline">还没有摘抄，点下方「＋ 添加」。</p>';
 
       bodyEl.innerHTML =
         '<div class="nn-page">' +
         '  <div class="nn-page-bar">' +
         '    <button class="btn ghost sm nn-back-btn" id="nn-back" type="button">← 书架</button>' +
+        '    <button class="btn sm ghost" id="nn-edit-book" type="button">编辑</button>' +
+        '    <button class="btn sm danger" id="nn-del-book" type="button">删除</button>' +
         '  </div>' +
-        '  <div class="nn-page-head">' +
-        '    <div class="nn-page-titles">' +
-        '      <h2>' + App.escapeHtml(b.title) +
-                '<span class="nn-book-type nn-book-type-' + tint + '">' + (tint === 'long' ? '📚 长篇' : '📖 短篇') + '</span></h2>' +
-        '      <p class="muted nn-page-tagline">' + (b.tagline ? App.escapeHtml(b.tagline) : '（点击下方「导语 · 编辑」写一句话简介）') + '</p>' +
+        '  <div class="nn-page-tabs" id="nn-page-tabs">' +
+        '    <button class="nn-page-tab on" data-tab="title" type="button">标题</button>' +
+        '    <button class="nn-page-tab" data-tab="tagline" type="button">导语</button>' +
+        '    <button class="nn-page-tab" data-tab="hook" type="button">拆书</button>' +
+        '    <button class="nn-page-tab" data-tab="chars" type="button">人设</button>' +
+        '    <button class="nn-page-tab" data-tab="quotes" type="button">摘抄</button>' +
+        '  </div>' +
+        '  <div class="nn-pages" id="nn-pages">' +
+        '    <div class="nn-pp" data-pp="title">' +
+        '      <div class="nn-pp-title-card">' +
+        '        <h2 class="nn-pp-book-title">' + App.escapeHtml(b.title) + '</h2>' +
+        '        <span class="nn-book-type nn-book-type-' + tint + '">' + (tint === 'long' ? '📚 长篇' : '📖 短篇') + '</span>' +
+        '        <p class="muted nn-pp-meta">摘抄 ' + quotes.length + ' · 分析 ' + analyses.length + '</p>' +
+        '      </div>' +
         '    </div>' +
-        '    <div class="nn-page-actions">' +
-        '      <button class="btn sm ghost" id="nn-edit-book" type="button">编辑</button>' +
-        '      <button class="btn sm danger" id="nn-del-book" type="button">删除</button>' +
+        '    <div class="nn-pp" data-pp="tagline">' +
+        '      <div class="nn-pp-section-head"><span>导语</span><button class="btn sm ghost" data-edit="tagline" type="button">编辑</button></div>' +
+        '      <div class="nn-pp-text">' + (b.tagline ? App.escapeHtml(b.tagline) : '<span class="muted">（未写导语）</span>') + '</div>' +
+        '    </div>' +
+        '    <div class="nn-pp" data-pp="hook">' +
+        '      <div class="nn-pp-section-head"><span>拆书 · 核心梗</span><button class="btn sm ghost" data-edit="hook" type="button">编辑</button></div>' +
+        '      <div class="nn-pp-text">' + (b.hook ? App.escapeHtml(b.hook) : '<span class="muted">（未写核心梗）</span>') + '</div>' +
+        '    </div>' +
+        '    <div class="nn-pp" data-pp="chars">' +
+        '      <div class="nn-pp-section-head"><span>人设</span><button class="btn sm ghost" data-edit="chars" type="button">编辑</button></div>' +
+        '      <div class="nn-pp-text">' + (b.chars ? App.escapeHtml(b.chars) : '<span class="muted">（未写人设）</span>') + '</div>' +
+        '    </div>' +
+        '    <div class="nn-pp" data-pp="quotes">' +
+        '      <div class="nn-pp-section-head"><span>摘抄</span><button class="btn sm" data-add="q" type="button">＋ 添加</button></div>' +
+        '      <div class="nn-section-list">' + qHtml + '</div>' +
+        '      <div class="nn-pp-section-head" style="margin-top:14px"><span>分析</span><button class="btn sm" data-add="a" type="button">＋ 添加</button></div>' +
+        '      <div class="nn-section-list">' + aHtml + '</div>' +
         '    </div>' +
         '  </div>' +
-        '  <div class="nn-section">' +
-        '    <div class="nn-section-head"><h3>导语</h3><button class="btn sm ghost" id="nn-edit-tagline" type="button">编辑</button></div>' +
-        '    <div class="nn-section-body">' + (b.tagline ? App.escapeHtml(b.tagline) : '<span class="muted">（未写导语）</span>') + '</div>' +
-        '  </div>' +
-        '  <div class="nn-section">' +
-        '    <div class="nn-section-head"><h3>核心梗</h3><button class="btn sm ghost" id="nn-edit-hook" type="button">编辑</button></div>' +
-        '    <div class="nn-section-body">' + (b.hook ? '<div class="nn-text">' + App.escapeHtml(b.hook) + '</div>' : '<span class="muted">（未写核心梗）</span>') + '</div>' +
-        '  </div>' +
-        '  <div class="nn-section">' +
-        '    <div class="nn-section-head"><h3>人设</h3><button class="btn sm ghost" id="nn-edit-chars" type="button">编辑</button></div>' +
-        '    <div class="nn-section-body">' + (b.chars ? '<div class="nn-text">' + App.escapeHtml(b.chars) + '</div>' : '<span class="muted">（未写人设）</span>') + '</div>' +
-        '  </div>' +
-        '  <div class="nn-section">' +
-        '    <div class="nn-section-head"><h3>分析</h3><button class="btn sm" id="nn-add-analysis" type="button">＋ 添加</button></div>' +
-        '    <div class="nn-section-list">' + aHtml + '</div>' +
-        '  </div>' +
-        '  <div class="nn-section">' +
-        '    <div class="nn-section-head"><h3>摘抄</h3><button class="btn sm" id="nn-add-quote" type="button">＋ 添加</button></div>' +
-        '    <div class="nn-section-list">' + qHtml + '</div>' +
+        '  <div class="nn-page-pager" id="nn-page-pager">' +
+        '    <span class="nn-page-pager-dot on" data-go="0"></span>' +
+        '    <span class="nn-page-pager-dot" data-go="1"></span>' +
+        '    <span class="nn-page-pager-dot" data-go="2"></span>' +
+        '    <span class="nn-page-pager-dot" data-go="3"></span>' +
+        '    <span class="nn-page-pager-dot" data-go="4"></span>' +
         '  </div>' +
         '</div>';
 
@@ -239,25 +252,43 @@ App.registerFeature({
           App.toast('已删除');
         });
       });
-      bodyEl.querySelector('#nn-edit-tagline').addEventListener('click', () => {
-        App.prompt('导语', b.tagline || '', (v) => {
-          if (v == null) return;
-          b.tagline = String(v).trim();
-          save(); paintDetail();
-        }, { hint: '一句话简介这本书，可留空' });
+
+      // 横滑同步：滚动 → tab+dot；tab/dot 点击 → 滚动
+      const pagesEl = bodyEl.querySelector('#nn-pages');
+      const tabsBtns = bodyEl.querySelectorAll('.nn-page-tab');
+      const pagerDots = bodyEl.querySelectorAll('.nn-page-pager-dot');
+      pagesEl.addEventListener('scroll', () => {
+        const i = Math.round(pagesEl.scrollLeft / pagesEl.clientWidth);
+        tabsBtns.forEach((bb, idx) => bb.classList.toggle('on', idx === i));
+        pagerDots.forEach((d, idx) => d.classList.toggle('on', idx === i));
       });
-      bodyEl.querySelector('#nn-edit-hook').addEventListener('click', () => {
-        openLongTextEditor('核心梗', b.hook || '', (v) => {
-          b.hook = v; save(); paintDetail();
-        }, '这本书的核心冲突或设定，可以是几句话');
+      tabsBtns.forEach((bb, i) => bb.addEventListener('click', () => {
+        pagesEl.scrollTo({ left: i * pagesEl.clientWidth, behavior: 'smooth' });
+      }));
+      pagerDots.forEach((d) => d.addEventListener('click', () => {
+        const i = +d.dataset.go;
+        pagesEl.scrollTo({ left: i * pagesEl.clientWidth, behavior: 'smooth' });
+      }));
+
+      bodyEl.querySelectorAll('[data-edit]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const k = btn.dataset.edit;
+          if (k === 'tagline') {
+            App.prompt('导语', b.tagline || '', (v) => {
+              if (v == null) return;
+              b.tagline = String(v).trim();
+              save(); paintDetail();
+            }, { hint: '一句话简介这本书，可留空' });
+          } else if (k === 'hook') {
+            openLongTextEditor('核心梗（拆书）', b.hook || '', (v) => { b.hook = v; save(); paintDetail(); }, '这本书的核心冲突或设定，可写多行');
+          } else if (k === 'chars') {
+            openLongTextEditor('人设', b.chars || '', (v) => { b.chars = v; save(); paintDetail(); }, '主要角色的人设要点（女主/男主/反派等），可写多行');
+          }
+        });
       });
-      bodyEl.querySelector('#nn-edit-chars').addEventListener('click', () => {
-        openLongTextEditor('人设', b.chars || '', (v) => {
-          b.chars = v; save(); paintDetail();
-        }, '主要角色的人设要点（女主/男主/反派等），可写多行');
+      bodyEl.querySelectorAll('[data-add]').forEach((btn) => {
+        btn.addEventListener('click', () => openItemEditor(b, btn.dataset.add, null));
       });
-      bodyEl.querySelector('#nn-add-analysis').addEventListener('click', () => openItemEditor(b, 'a', null));
-      bodyEl.querySelector('#nn-add-quote').addEventListener('click', () => openItemEditor(b, 'q', null));
       bodyEl.querySelectorAll('[data-iedit]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();

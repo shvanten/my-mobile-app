@@ -49,12 +49,11 @@ App.registerFeature({
       '<div class="mo">' +
       '  <div class="mo-head"><h2>心情</h2><span class="muted">每天记录此刻的感受</span></div>' +
       '  <div class="mo-pages" id="mo-pages">' +
-      '    <div class="mo-page" data-page="today">' +
-      '      <div class="mo-today-card" id="mo-today-card"></div>' +
-      '      <div class="mo-hist-title">心情日历</div>' +
+      '    <div class="mo-page mo-page-tall" data-page="today">' +
       '      <div class="mo-cal" id="mo-cal"></div>' +
+      '      <div class="mo-today-card" id="mo-today-card"></div>' +
       '    </div>' +
-      '    <div class="mo-page" data-page="summary">' +
+      '    <div class="mo-page mo-page-tall" data-page="summary">' +
       '      <div class="mo-hist-title">心情分布 · 最近30天</div>' +
       '      <div class="mo-pie" id="mo-pie"></div>' +
       '      <div class="mo-hist-title">每周小结</div>' +

@@ -370,6 +370,9 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 
 /* 打卡根容器：弹性列，撑满内容区；只有中间的日历"小窗"可滚动，整页不滚 */
 .feature:has(.ci) { height: 100%; }
+.feature:has(.nn) { display: flex; flex-direction: column; height: 100%; }
+.feature:has(.mo) { height: 100%; display: flex; flex-direction: column; }
+.feature:has(.lg) { height: 100%; display: flex; flex-direction: column; }
 .ci {
   display: flex;
   flex-direction: column;
@@ -1010,7 +1013,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 /* ============================================================
    小说拆文便签（notes）
    ============================================================ */
-.nn { display: flex; flex-direction: column; gap: 12px; }
+.nn { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
 .nn-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .nn-head h2 { margin: 0; font-size: 20px; color: var(--text-strong); }
 .nn-tabs { display: flex; gap: 6px; background: var(--surface-2); border-radius: 999px; padding: 3px; }
@@ -1538,10 +1541,20 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 /* ============================================================
    横滑双页（mood / ledger 共用）
    ============================================================ */
+.mo,
+.lg {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
 .mo-pages,
 .lg-pages {
   display: flex;
+  flex: 1;
+  min-height: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -1555,7 +1568,20 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   min-width: 100%;
   box-sizing: border-box;
   padding-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
+/* mood: 整页内部窗口滚动，外层 page 不滚 */
+.mo-page-tall {
+  overflow-y: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 20px;
+}
+.mo-page-tall::-webkit-scrollbar { display: none; }
+/* ledger page 不需要窗口滚动 */
+.lg-page { overflow: visible; }
 .mo-pager,
 .lg-pager {
   display: flex; gap: 6px; justify-content: center;
@@ -1620,27 +1646,8 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .mo-pie-n { color: var(--muted); }
 .mo-pie-c { color: var(--text-strong); font-weight: 600; font-size: 12px; }
 .mo-pie-p { color: var(--accent-deep); font-size: 12px; min-width: 36px; text-align: right; }
-[data-theme="dark"] .mo-pie-p { color: var(--accent-soft); }/* ============================================================
-   横滑双页（mood / ledger 共用）
-   ============================================================ */
-.mo-pages,
-.lg-pages {
-  display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-.mo-pages::-webkit-scrollbar,
-.lg-pages::-webkit-scrollbar { display: none; }
-.mo-page,
-.lg-page {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-  min-width: 100%;
-  box-sizing: border-box;
-  padding-bottom: 12px;
-}
+[data-theme="dark"] .mo-pie-p { color: var(--accent-soft); }
+
 .mo-pager,
 .lg-pager {
   display: flex; gap: 6px; justify-content: center;
@@ -1973,3 +1980,108 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   color: var(--muted);
 }
 .nn-item-ops .nn-op:active { background: rgba(0,0,0,.08); }
+
+/* ============================================================
+   小说：详情页 横滑 5 tab（标题/导语/拆书/人设/摘抄）
+   ============================================================ */
+.nn-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.nn-page-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 4px 8px;
+  flex-shrink: 0;
+}
+.nn-page-bar .nn-back-btn { margin-right: auto; }
+.nn-page-tabs {
+  display: flex; gap: 4px;
+  background: var(--surface-2);
+  border-radius: 999px; padding: 3px;
+  flex-shrink: 0;
+}
+.nn-page-tab {
+  border: none; background: transparent;
+  color: var(--muted); font: inherit; font-size: 12.5px;
+  padding: 5px 12px; border-radius: 999px; cursor: pointer;
+}
+.nn-page-tab.on {
+  background: var(--surface); color: var(--text-strong);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(40,60,40,.12);
+}
+.nn-pages {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.nn-pages::-webkit-scrollbar { display: none; }
+.nn-pp {
+  flex: 0 0 100%;
+  scroll-snap-align: start;
+  min-width: 100%;
+  box-sizing: border-box;
+  padding: 4px 4px 16px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.nn-pp::-webkit-scrollbar { display: none; }
+
+/* 标题 tab：大字号 */
+.nn-pp-title-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 20px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.nn-pp-book-title {
+  margin: 0; font-size: 22px; color: var(--text-strong);
+  line-height: 1.3;
+}
+.nn-pp-title-card .nn-book-type { font-size: 13px; padding: 4px 12px; }
+.nn-pp-meta { margin: 0; font-size: 12.5px; }
+
+/* 通用段位头 */
+.nn-pp-section-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 8px;
+}
+.nn-pp-section-head span {
+  font-size: 14px; font-weight: 700; color: var(--text-strong);
+}
+.nn-pp-text {
+  font-size: 14px; line-height: 1.7; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  min-height: 80px;
+}
+
+/* 摘抄 tab 内 section-list 用 .nn-section-list 旧样式 */
+
+.nn-page-pager {
+  display: flex; gap: 6px; justify-content: center;
+  padding: 6px 0 8px; flex-shrink: 0;
+}
+.nn-page-pager-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border); cursor: pointer;
+  transition: width .25s ease, background .25s ease;
+}
+.nn-page-pager-dot.on {
+  width: 18px; border-radius: 999px;
+  background: var(--accent);
+}
