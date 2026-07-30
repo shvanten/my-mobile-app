@@ -1664,6 +1664,36 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 }
 .mo-today-empty { font-size: 13px; padding: 8px 0; }
 .mo-today-editor { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+/* 今天：每条心情独立卡片 */
+.mo-items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.mo-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.mo-item-e { font-size: 26px; line-height: 1.1; flex: 0 0 auto; }
+.mo-item-body { flex: 1; min-width: 0; }
+.mo-item-name { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+.mo-item-note {
+  font-size: 13px; line-height: 1.6; color: var(--text); margin: 4px 0 0;
+  background: var(--surface); border-radius: 8px; padding: 7px 9px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.mo-item-ops { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+.mo-add-btn { margin-top: 4px; }
+.mo-edit-title { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+
+/* 详情弹层：每条心情 + 说明 */
+.mo-day-items { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+.mo-day-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-2); border-radius: var(--radius-sm); padding: 8px 10px;
+}
+.mo-day-e { font-size: 24px; line-height: 1.1; flex: 0 0 auto; }
+.mo-day-note { flex: 1; margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); }
+.mo-day-note.muted { color: var(--muted); }
+
 .mo-today-actions { display: flex; gap: 10px; }
 .mo-today-actions .btn { flex: 1; }
 
@@ -1730,6 +1760,36 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 }
 .mo-today-empty { font-size: 13px; padding: 8px 0; }
 .mo-today-editor { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+
+/* 今天：每条心情独立卡片 */
+.mo-items { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.mo-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+}
+.mo-item-e { font-size: 26px; line-height: 1.1; flex: 0 0 auto; }
+.mo-item-body { flex: 1; min-width: 0; }
+.mo-item-name { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+.mo-item-note {
+  font-size: 13px; line-height: 1.6; color: var(--text); margin: 4px 0 0;
+  background: var(--surface); border-radius: 8px; padding: 7px 9px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.mo-item-ops { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+.mo-add-btn { margin-top: 4px; }
+.mo-edit-title { font-size: 13px; font-weight: 700; color: var(--text-strong); }
+
+/* 详情弹层：每条心情 + 说明 */
+.mo-day-items { display: flex; flex-direction: column; gap: 10px; margin: 10px 0; }
+.mo-day-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface-2); border-radius: var(--radius-sm); padding: 8px 10px;
+}
+.mo-day-e { font-size: 24px; line-height: 1.1; flex: 0 0 auto; }
+.mo-day-note { flex: 1; margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); }
+.mo-day-note.muted { color: var(--muted); }
+
 .mo-today-actions { display: flex; gap: 10px; }
 .mo-today-actions .btn { flex: 1; }
 

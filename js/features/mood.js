@@ -1,8 +1,10 @@
 /**
  * 每日心情打卡：
- * - 第 1 页：今日记录（编辑/删除今日心情）
- * - 第 2 页：心情日历（每天的表情显示在日期下方，点击查看）
+ * - 第 1 页：今日记录（每天可记多条心情，每条心情各自带一段「情况说明」）
+ * - 第 2 页：心情日历（每天的表情显示在日期下方，点击查看当天每条心情）
  * - 第 3 页：总结（最近30天扇形图 + 每周小结 + 近期可视化）
+ *
+ * 数据模型：data['YYYY-MM-DD'] = { items: [ { e:'😊', note:'...' }, ... ] }
  */
 App.registerFeature({
   id: 'mood',
@@ -15,11 +17,23 @@ App.registerFeature({
 
     // ---------- 存储 ----------
     function load() {
-      try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
+      let obj;
+      try { obj = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { obj = {}; }
+      // 迁移：旧结构 { list:[emoji...], note:'...' } -> { items:[{e,note}] }
+      Object.keys(obj).forEach((ds) => {
+        const rec = obj[ds];
+        if (!rec || typeof rec !== 'object') return;
+        if (rec.list && !rec.items) {
+          rec.items = (rec.list || []).map((e, i) => ({ e: e, note: i === 0 ? (rec.note || '') : '' }));
+          delete rec.list; delete rec.note;
+        }
+        if (!rec.items) rec.items = [];
+      });
+      return obj;
     }
     function save() { localStorage.setItem(KEY, JSON.stringify(data)); if (window.Sync) Sync.markDirty(); }
 
-    let data = load();   // { 'YYYY-MM-DD': { list:['😊',...], note:'...' } }
+    let data = load();
 
     // ---------- 工具 ----------
     const pad = (n) => (n < 10 ? '0' + n : '' + n);
@@ -36,8 +50,14 @@ App.registerFeature({
     const PIE_COLORS = ['#7aa6c2', '#e09b6c', '#a3c46a', '#c46a8d', '#9b6ac4', '#c4b86a', '#6ac4a3', '#c46a6a', '#6a6fc4', '#c4a36a', '#7a7a7a', '#aaaaaa'];
     function moodName(e) { const m = MOODS.find((m) => m.e === e); return m ? m.n : e; }
 
-    // 今天已选中的心情（emoji 集合）
-    let sel = new Set();
+    // 编辑器状态（模块级，跨重渲染保留）
+    let editorMode = 'add';   // 'add' | 'edit'
+    let editIdx = -1;
+    let selMood = null;        // 单选用：当前选中的 emoji
+
+    // 今天已记的心情条目
+    function todayItems() { const r = data[todayStr()]; return r && r.items ? r.items : []; }
+
     // 日历当前显示的年月
     const now = new Date();
     let calY = now.getFullYear();
@@ -99,101 +119,145 @@ App.registerFeature({
     // ---------- 今日心情卡片 ----------
     function renderTodayCard() {
       const t = todayStr();
-      const rec = data[t];
-      const has = rec && ((rec.list && rec.list.length) || rec.note);
-      const emojis = (rec && rec.list) ? rec.list : [];
-      const note = (rec && rec.note) || '';
+      const items = todayItems();
+      const has = items.length > 0;
+      const itemCards = items.map((it, idx) =>
+        '<div class="mo-item" data-idx="' + idx + '">' +
+        '  <span class="mo-item-e">' + it.e + '</span>' +
+        '  <div class="mo-item-body">' +
+        '    <span class="mo-item-name">' + moodName(it.e) + '</span>' +
+        (it.note ? '<p class="mo-item-note">' + App.escapeHtml(it.note) + '</p>' : '') +
+        '  </div>' +
+        '  <div class="mo-item-ops">' +
+        '    <button class="btn ghost sm" data-edit="' + idx + '" type="button">编辑</button>' +
+        '    <button class="btn ghost sm" data-del="' + idx + '" type="button">删除</button>' +
+        '  </div>' +
+        '</div>'
+      ).join('');
+
       todayCardEl.innerHTML =
         '<div class="mo-today-head">' +
         '  <span class="mo-today-date">今天 · ' + t + '</span>' +
-        '  <div class="mo-today-ops">' +
-        (has ? '<button class="btn ghost sm" id="mo-del-today" type="button">删除</button>' : '') +
-        '    <button class="btn sm" id="mo-edit-today" type="button">' + (has ? '编辑' : '记录') + '</button>' +
-        '  </div>' +
+        (has ? '<button class="btn ghost sm" id="mo-del-today" type="button">删除今日</button>' : '') +
         '</div>' +
         (has
-          ? '<div class="mo-today-preview">' +
-            '  <div class="mo-today-emojis">' + (emojis.length ? emojis.join(' ') : '<span class="muted">（无）</span>') + '</div>' +
-            (note ? '<div class="mo-today-note">' + App.escapeHtml(note) + '</div>' : '') +
-            '</div>'
-          : '<div class="mo-today-empty muted">今天还没记录心情</div>'
-        ) +
+          ? '<div class="mo-items">' + itemCards + '</div>'
+          : '<div class="mo-today-empty muted">今天还没记录心情</div>') +
+        '<button class="btn block sm" id="mo-add" type="button">＋ 添加一条心情</button>' +
         '<div class="mo-today-editor" id="mo-today-editor" hidden>' +
+        '  <div class="mo-edit-title" id="mo-edit-title">添加心情</div>' +
         '  <div class="mo-moods" id="mo-moods"></div>' +
-        '  <textarea id="mo-note" class="mo-note" maxlength="200" rows="3" placeholder="记录一下今天的缘由（可选）"></textarea>' +
+        '  <textarea id="mo-note" class="mo-note" maxlength="200" rows="2" placeholder="这个情况是怎么回事？（每条心情各自的情况说明，可选）"></textarea>' +
         '  <div class="mo-today-actions">' +
         '    <button class="btn ghost" id="mo-cancel-today" type="button">取消</button>' +
         '    <button class="btn" id="mo-save-today" type="button">保存</button>' +
         '  </div>' +
         '</div>';
+
       renderMoodButtons();
-      const liveNoteEl = container.querySelector('#mo-note');
-      if (liveNoteEl) liveNoteEl.value = note;
-      const editor = container.querySelector('#mo-today-editor');
-      const editBtn = container.querySelector('#mo-edit-today');
-      const delBtn = container.querySelector('#mo-del-today');
-      const cancelBtn = container.querySelector('#mo-cancel-today');
-      const saveBtn = container.querySelector('#mo-save-today');
-
-      function showEditor() {
-        editor.hidden = false;
-        editBtn && (editBtn.hidden = true);
-      }
-      function hideEditor() {
-        editor.hidden = true;
-        editBtn && (editBtn.hidden = false);
-        sel = new Set(emojis);
-        renderMoodButtons();
-        const ne = container.querySelector('#mo-note');
-        if (ne) ne.value = note;
-      }
-
-      if (editBtn) editBtn.addEventListener('click', showEditor);
-      if (cancelBtn) cancelBtn.addEventListener('click', hideEditor);
-      if (saveBtn) saveBtn.addEventListener('click', () => {
-        const ne2 = container.querySelector('#mo-note');
-        const list = Array.from(sel);
-        const nn = ne2 ? ne2.value.trim() : '';
-        if (!list.length && !nn) { App.toast('选一个心情，或写点什么吧'); return; }
-        data[t] = { list: list, note: nn };
-        save();
-        App.toast('已保存今日心情 🌈');
-        renderTodayCard();
-        renderCalendar();
-        renderSummary();
-      });
-      if (delBtn) delBtn.addEventListener('click', () => {
-        App.confirm('删除今日心情', '确认删除「' + t + '」的心情记录？', () => {
-          delete data[t];
-          save();
-          App.toast('已删除');
-          renderTodayCard();
-          renderCalendar();
-          renderSummary();
-        });
-      });
     }
 
-    // moodsEl 改为函数内查询（renderTodayCard 首次执行时才会创建 #mo-moods）
+    // 单选用心情选择网格
     function renderMoodButtons() {
       const moodsEl = container.querySelector('#mo-moods');
       if (!moodsEl) return;
       moodsEl.innerHTML = MOODS.map((m) => {
-        const on = sel.has(m.e) ? ' on' : '';
+        const on = selMood === m.e ? ' on' : '';
         return '<button class="mo-mood' + on + '" type="button" data-e="' + m.e + '" ' +
-          'aria-pressed="' + (sel.has(m.e) ? 'true' : 'false') + '" title="' + m.n + '">' +
+          'aria-pressed="' + (selMood === m.e ? 'true' : 'false') + '" title="' + m.n + '">' +
           '<span class="mo-mood-e">' + m.e + '</span><span class="mo-mood-n">' + m.n + '</span>' +
           '</button>';
       }).join('');
       moodsEl.onclick = (e) => {
         const b = e.target.closest('[data-e]');
         if (!b) return;
-        const e2 = b.dataset.e;
-        if (sel.has(e2)) sel.delete(e2); else sel.add(e2);
-        b.classList.toggle('on');
-        b.setAttribute('aria-pressed', b.classList.contains('on') ? 'true' : 'false');
+        selMood = b.dataset.e;
+        moodsEl.querySelectorAll('.mo-mood').forEach((x) =>
+          x.classList.toggle('on', x.dataset.e === selMood));
       };
     }
+
+    // 打开编辑器（add 或 edit）
+    function openEditor(mode, idx) {
+      editorMode = mode; editIdx = idx;
+      const titleEl = container.querySelector('#mo-edit-title');
+      const editor = container.querySelector('#mo-today-editor');
+      const ne = container.querySelector('#mo-note');
+      if (mode === 'add') {
+        selMood = null;
+        titleEl.textContent = '添加心情';
+        if (ne) ne.value = '';
+      } else {
+        const it = todayItems()[idx];
+        if (!it) return;
+        selMood = it.e;
+        titleEl.textContent = '编辑 · ' + moodName(it.e);
+        if (ne) ne.value = it.note || '';
+      }
+      editor.hidden = false;
+      renderMoodButtons();
+    }
+    function closeEditor() {
+      const editor = container.querySelector('#mo-today-editor');
+      if (editor) editor.hidden = true;
+      editorMode = 'add'; editIdx = -1; selMood = null;
+    }
+
+    function saveItem() {
+      const ne = container.querySelector('#mo-note');
+      const note = ne ? ne.value.trim() : '';
+      const t = todayStr();
+      if (!selMood) { App.toast('先选一个心情表情'); return; }
+      if (!data[t]) data[t] = { items: [] };
+      if (editorMode === 'add') {
+        data[t].items.push({ e: selMood, note: note });
+      } else {
+        const it = data[t].items[editIdx];
+        if (!it) { closeEditor(); return; }
+        it.e = selMood; it.note = note;
+      }
+      save();
+      App.toast(editorMode === 'add' ? '已添加这条心情 🌈' : '已更新');
+      closeEditor();
+      renderTodayCard();
+      renderCalendar();
+      renderSummary();
+    }
+
+    // 今天卡片内的事件（委托在 todayCardEl 上，仅绑定一次）
+    todayCardEl.addEventListener('click', (e) => {
+      const addBtn = e.target.closest('#mo-add');
+      const editBtn = e.target.closest('[data-edit]');
+      const delBtn = e.target.closest('[data-del]');
+      const cancelBtn = e.target.closest('#mo-cancel-today');
+      const saveBtn = e.target.closest('#mo-save-today');
+      const delDayBtn = e.target.closest('#mo-del-today');
+      if (addBtn) { openEditor('add', -1); return; }
+      if (editBtn) { openEditor('edit', parseInt(editBtn.dataset.edit, 10)); return; }
+      if (delBtn) {
+        const idx = parseInt(delBtn.dataset.del, 10);
+        App.confirm('删除这条心情', '确认删除「' + moodName(todayItems()[idx].e) + '」这一条记录？', () => {
+          const t = todayStr();
+          data[t].items.splice(idx, 1);
+          if (!data[t].items.length) delete data[t];
+          save();
+          App.toast('已删除');
+          renderTodayCard(); renderCalendar(); renderSummary();
+        });
+        return;
+      }
+      if (delDayBtn) {
+        App.confirm('删除今日心情', '确认删除「' + todayStr() + '」的全部心情记录？', () => {
+          delete data[todayStr()];
+          save();
+          App.toast('已删除');
+          renderTodayCard(); renderCalendar(); renderSummary();
+        });
+        return;
+      }
+      if (cancelBtn) { closeEditor(); return; }
+      if (saveBtn) { saveItem(); return; }
+    });
 
     // ---------- 心情日历 ----------
     function renderCalendar() {
@@ -210,9 +274,9 @@ App.registerFeature({
         const isToday = ds === tStr;
         const isFuture = ds > tStr;
         let emojis = '';
-        if (rec && rec.list && rec.list.length) {
-          const show = rec.list.slice(0, 2).join('');
-          const more = rec.list.length > 2 ? '<span class="mo-cal-more">+' + (rec.list.length - 2) + '</span>' : '';
+        if (rec && rec.items && rec.items.length) {
+          const show = rec.items.slice(0, 2).map((i) => i.e).join('');
+          const more = rec.items.length > 2 ? '<span class="mo-cal-more">+' + (rec.items.length - 2) + '</span>' : '';
           emojis = '<span class="mo-cal-emojis">' + show + more + '</span>';
         }
         cells +=
@@ -246,29 +310,31 @@ App.registerFeature({
       if (day) openDayDetail(day.dataset.day);
     });
 
-    // 某天详情弹层（查看 / 删除）
+    // 某天详情弹层（查看每条心情 + 其说明 / 删除当天）
     function openDayDetail(ds) {
       const rec = data[ds];
       if (!rec) return;
       const wrap = document.createElement('div');
       wrap.className = 'mo-mask';
-      const emojis = (rec.list || []).map((e) =>
-        '<span class="mo-day-e" title="' + moodName(e) + '">' + e + '</span>').join('');
+      const emojis = (rec.items || []).map((it) =>
+        '<div class="mo-day-item">' +
+        '  <span class="mo-day-e" title="' + moodName(it.e) + '">' + it.e + '</span>' +
+        (it.note ? '<p class="mo-day-note">' + App.escapeHtml(it.note) + '</p>' : '<p class="mo-day-note muted">（无说明）</p>') +
+        '</div>').join('');
       wrap.innerHTML =
         '<div class="mo-day-sheet">' +
         '  <div class="mo-day-date">' + ds + '</div>' +
-        '  <div class="mo-day-emojis">' + (emojis || '<span class="muted">（无表情）</span>') + '</div>' +
-        (rec.note ? '<p class="mo-day-note">' + App.escapeHtml(rec.note) + '</p>' : '') +
+        '  <div class="mo-day-items">' + emojis + '</div>' +
         '  <div class="mo-day-btns">' +
         '    <button class="btn ghost" data-close="1" type="button">关闭</button>' +
-        '    <button class="btn danger" data-del="1" type="button">删除记录</button>' +
+        '    <button class="btn danger" data-del="1" type="button">删除当天</button>' +
         '  </div>' +
         '</div>';
       document.body.appendChild(wrap);
       wrap.addEventListener('click', (e) => {
         if (e.target === wrap || e.target.closest('[data-close]')) { wrap.remove(); return; }
         if (e.target.closest('[data-del]')) {
-          App.confirm('删除心情', '确认删除 ' + ds + ' 的心情记录？', () => {
+          App.confirm('删除心情', '确认删除 ' + ds + ' 的全部心情记录？', () => {
             delete data[ds];
             save();
             wrap.remove();
@@ -293,9 +359,9 @@ App.registerFeature({
         cur.end = d;
         const ds = calY + '-' + pad(calM + 1) + '-' + pad(d);
         const rec = data[ds];
-        if (rec && rec.list && rec.list.length) {
+        if (rec && rec.items && rec.items.length) {
           cur.days++;
-          rec.list.forEach((e) => { cur.counts[e] = (cur.counts[e] || 0) + 1; });
+          rec.items.forEach((it) => { cur.counts[it.e] = (cur.counts[it.e] || 0) + 1; });
         }
       }
       const rows = weeks.map((w, i) => {
@@ -322,7 +388,7 @@ App.registerFeature({
         const d = new Date();
         d.setDate(d.getDate() - i);
         const rec = data[fmt(d)];
-        if (rec && rec.list) rec.list.forEach((e) => { counts[e] = (counts[e] || 0) + 1; total++; });
+        if (rec && rec.items) rec.items.forEach((it) => { counts[it.e] = (counts[it.e] || 0) + 1; total++; });
       }
       const keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
       if (!keys.length) {
@@ -339,7 +405,7 @@ App.registerFeature({
           '  <span class="mo-viz-c">' + counts[e] + '次</span>' +
           '</div>';
       }).join('') +
-      '<p class="mo-viz-total muted">30天内共 ' + total + ' 次心情记录</p>';
+      '<p class="mo-viz-total muted">30天内共 ' + total + ' 条心情记录</p>';
     }
 
     // ---------- 扇形图（最近30天心情分布） ----------
@@ -350,7 +416,7 @@ App.registerFeature({
         const d = new Date();
         d.setDate(d.getDate() - i);
         const rec = data[fmt(d)];
-        if (rec && rec.list) rec.list.forEach((e) => { counts[e] = (counts[e] || 0) + 1; total++; });
+        if (rec && rec.items) rec.items.forEach((it) => { counts[it.e] = (counts[it.e] || 0) + 1; total++; });
       }
       const keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
       if (!keys.length) {
