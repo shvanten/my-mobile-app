@@ -539,8 +539,11 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
     place-items: center;
   }
 }
-/* morph 时小任务方框淡出（在 morph 头 0.3s 内完成） */
+/* morph 时小任务方框淡出（在 morph 头 0.3s 内完成）；
+   同时脱离布局（position:absolute）——避免 5 个子项把 grid 撑出 84px 容器把 ✓ 挤到框外 */
 .ci-parts.all-done .ci-part-wrap {
+  position: absolute;
+  pointer-events: none;
   animation: ci-fade-out .3s ease forwards;
 }
 @keyframes ci-fade-out {
