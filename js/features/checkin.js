@@ -216,7 +216,8 @@ App.registerFeature({
           '</p>';
       } else {
         // 只有今天：直接显示可点击的小任务方框（不再显示日期/名称/进度，顶部 habit 列表已有）
-        html += '<div class="ci-parts">';
+        const allDone = done === h.parts;
+        html += '<div class="ci-parts' + (allDone ? ' all-done' : '') + '">';
         const labels = (h.labels && h.labels.length === h.parts)
           ? h.labels
           : arr.map((_, i) => '第' + (i + 1) + '份');
@@ -277,7 +278,9 @@ App.registerFeature({
       arr[i] = !arr[i];
       saveRecords();
       const done = arr.filter(Boolean).length;
-      paintCalendar(); paintDetail();
+      // 日历格子只在"全部完成"那一刻才更新；小任务进度不自动驱动日历颜色
+      if (done === h.parts) paintCalendar();
+      paintDetail();
       if (done === h.parts) App.toast('今天「' + h.name + '」全部完成 🎉');
     });
 

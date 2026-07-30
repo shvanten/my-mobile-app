@@ -432,18 +432,50 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   padding: 16px;
 }
 .ci-locked { font-size: 13px; color: var(--muted); margin: 0; text-align: center; letter-spacing: .5px; }
-.ci-parts { display: flex; flex-wrap: wrap; gap: 14px 12px; }
-.ci-part-wrap { display: flex; align-items: center; justify-content: center; }
-.ci-part {
-  width: 68px; height: 68px; border-radius: 16px;
-  border: 1px solid var(--border);
+/* 小任务容器：默认横向居中条；全部完成后外框加深、变成直径=外框宽的圆形按钮 */
+.ci-parts {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 16px 14px;
+  min-height: 92px;
   background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition:
+    background .35s ease,
+    border-radius .35s ease,
+    aspect-ratio .35s ease,
+    box-shadow .35s ease,
+    border-color .35s ease,
+    padding .35s ease,
+    max-width .35s ease;
+}
+/* 全部完成：外框变深绿 → 圆形；子框变浅绿 → 两者融合成一个圆形按钮 */
+.ci-parts.all-done {
+  background: var(--accent-deep);
+  border-color: transparent;
+  border-radius: 50%;
+  aspect-ratio: 1;
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 22px 18px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--accent-deep) 30%, transparent);
+}
+.ci-part-wrap { display: flex; align-items: center; justify-content: center; flex: 0 1 auto; }
+.ci-part {
+  width: 60px; height: 60px; border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   color: var(--text);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   padding: 4px;
-  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease, color .15s ease;
+  transition: background .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, transform .1s ease;
 }
+.ci-part:active { transform: scale(.94); }
 .ci-part-text {
   font-size: 13px; line-height: 1.2;
   text-align: center;
@@ -456,9 +488,16 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   background: var(--accent);
   border-color: var(--accent-deep);
   color: var(--on-accent);
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 28%, transparent);
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--accent) 25%, transparent);
 }
-.ci-part.on[disabled] { opacity: .7; }
+/* 全部完成：子框变浅（与外框颜色翻转），去掉边框/阴影让"色块"融入圆形按钮 */
+.ci-parts.all-done .ci-part {
+  background: var(--accent-soft);
+  color: var(--text-strong);
+  border-color: transparent;
+  box-shadow: none;
+}
+.ci-parts.all-done .ci-part:active { transform: scale(.96); }
 
 .ci-modal {
   position: fixed; inset: 0; z-index: 80;
