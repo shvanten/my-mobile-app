@@ -74,12 +74,16 @@ App.registerFeature({
       '  <div class="lg-pages" id="lg-pages">' +
       '    <div class="lg-page" data-page="main">' +
       '      <div class="lg-bal">' +
-      '        <span class="lg-bal-label">当前存款</span>' +
-      '        <span class="lg-bal-num" id="lg-bal-num">' + money(balance()) + '</span>' +
-      '        <span class="lg-bal-sub" id="lg-bal-sub"></span>' +
-      '        <div class="lg-enter-row">' +
-      '          <span class="lg-enter-sign" id="lg-enter-sign">−</span>' +
-      '          <input id="lg-amount" class="lg-enter-input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="金额" />' +
+      '        <div class="lg-bal-left">' +
+      '          <span class="lg-bal-label">当前存款</span>' +
+      '          <span class="lg-bal-num" id="lg-bal-num">' + money(balance()) + '</span>' +
+      '          <span class="lg-bal-sub" id="lg-bal-sub"></span>' +
+      '        </div>' +
+      '        <div class="lg-bal-right">' +
+      '          <div class="lg-enter-row">' +
+      '            <span class="lg-enter-sign" id="lg-enter-sign">−</span>' +
+      '            <input id="lg-amount" class="lg-enter-input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="金额" />' +
+      '          </div>' +
       '          <button class="btn" id="lg-ok" type="button">记一笔</button>' +
       '        </div>' +
       '      </div>' +
