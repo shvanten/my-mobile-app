@@ -242,6 +242,53 @@
   backdropEl.addEventListener('click', closeDrawer);
   window.addEventListener('hashchange', render);
 
+  // ---------- 数据备份：导出 / 导入整个本地存储 ----------
+  function backupExport() {
+    try {
+      const items = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k) items[k] = localStorage.getItem(k);
+      }
+      const payload = { _backup: 'my-mobile-app', exportedAt: new Date().toISOString(), items };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const d = new Date();
+      const pad = (n) => (n < 10 ? '0' + n : '' + n);
+      a.href = url;
+      a.download = 'myapp-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      toast('已导出全部数据');
+    } catch (e) { console.error(e); toast('导出失败'); }
+  }
+  function backupImport(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || ''));
+        const items = (parsed && parsed._backup && parsed.items) ? parsed.items : null;
+        if (!items) { toast('文件格式不正确，无法导入'); return; }
+        confirmDialog('导入数据', '导入会用备份覆盖当前所有本地数据，确定继续？\n（建议先点「导出」备份当前数据）', () => {
+          for (const k in items) { try { localStorage.setItem(k, items[k]); } catch (e) {} }
+          toast('已导入，正在刷新…');
+          setTimeout(() => location.reload(), 600);
+        }, { okText: '导入并覆盖' });
+      } catch (e) { console.error(e); toast('解析失败：不是有效的 JSON'); }
+    };
+    reader.readAsText(file);
+  }
+  const backupFileEl = document.getElementById('backup-file');
+  document.getElementById('nav-export').addEventListener('click', () => { closeDrawer(); backupExport(); });
+  if (backupFileEl) {
+    document.getElementById('nav-import').addEventListener('click', () => { closeDrawer(); backupFileEl.click(); });
+    backupFileEl.addEventListener('change', () => {
+      if (backupFileEl.files && backupFileEl.files[0]) backupImport(backupFileEl.files[0]);
+      backupFileEl.value = '';
+    });
+  }
+
   applyTheme(getPreferredTheme());
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render);
   else render();
