@@ -1,4 +1,4 @@
-const CACHE = 'myapp-v49';
+const CACHE = 'myapp-v50';
 const ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,6 @@ const ASSETS = [
   './js/features/mood.js',
   './js/features/ledger.js',
   './js/features/sticky.js',
-  './js/features/sync.js',
   './manifest.json',
   './assets/icon.svg'
 ];

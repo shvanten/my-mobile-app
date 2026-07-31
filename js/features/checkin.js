@@ -19,16 +19,16 @@ App.registerFeature({
     function loadHabits() {
       try { return JSON.parse(localStorage.getItem(HABITS_KEY)) || []; } catch (e) { return []; }
     }
-    function saveHabits() { localStorage.setItem(HABITS_KEY, JSON.stringify(habits)); if (window.Sync) Sync.markDirty(); }
+    function saveHabits() { localStorage.setItem(HABITS_KEY, JSON.stringify(habits)) }
     function loadRecords() {
       try { return JSON.parse(localStorage.getItem(REC_KEY)) || {}; } catch (e) { return {}; }
     }
-    function saveRecords() { localStorage.setItem(REC_KEY, JSON.stringify(records)); if (window.Sync) Sync.markDirty(); }
+    function saveRecords() { localStorage.setItem(REC_KEY, JSON.stringify(records)) }
     const ARCHIVE_KEY = 'checkin.archived.v1';
     function loadArchived() {
       try { return JSON.parse(localStorage.getItem(ARCHIVE_KEY)) || []; } catch (e) { return []; }
     }
-    function saveArchived() { localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived)); if (window.Sync) Sync.markDirty(); }
+    function saveArchived() { localStorage.setItem(ARCHIVE_KEY, JSON.stringify(archived)) }
 
     let habits = loadHabits();
     let records = loadRecords();

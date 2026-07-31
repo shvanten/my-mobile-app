@@ -16,9 +16,10 @@ my-mobile-app/
 └─ js/
    ├─ app.js            # 核心框架：路由 / 主题 / 首页 / 工具（一般不用改）
    └─ features/         # ★ 你的功能都放这里
-      ├─ hello.js       # 示例：静态页
-      ├─ todo.js        # 示例：待办清单（带本地保存）
-      └─ sync.js        # 多端同步（记账/打卡/心情/便签）
+      ├─ checkin.js     # 打卡
+      ├─ mood.js        # 心情记录
+      ├─ ledger.js      # 记账
+      └─ sticky.js      # 便签
 ```
 
 ## 在手机上运行（3 步）

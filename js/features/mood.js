@@ -31,7 +31,7 @@ App.registerFeature({
       });
       return obj;
     }
-    function save() { localStorage.setItem(KEY, JSON.stringify(data)); if (window.Sync) Sync.markDirty(); }
+    function save() { localStorage.setItem(KEY, JSON.stringify(data)) }
 
     let data = load();
 

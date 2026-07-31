@@ -25,7 +25,7 @@ App.registerFeature({
       try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && Array.isArray(d.notes)) return d; } catch (e) {}
       return { notes: [] };
     }
-    function save() { localStorage.setItem(KEY, JSON.stringify(data)); if (window.Sync) Sync.markDirty(); }
+    function save() { localStorage.setItem(KEY, JSON.stringify(data)) }
     let data = load();
     const uid = (p) => (p || 's') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
