@@ -77,16 +77,14 @@ App.registerFeature({
       '        <span class="lg-bal-label">当前存款</span>' +
       '        <span class="lg-bal-num" id="lg-bal-num">' + money(balance()) + '</span>' +
       '        <span class="lg-bal-sub" id="lg-bal-sub"></span>' +
-      '      </div>' +
-      '      <div class="lg-enter">' +
       '        <div class="lg-enter-row">' +
-      '          <span class="lg-enter-sign">¥</span>' +
+      '          <span class="lg-enter-sign" id="lg-enter-sign">−</span>' +
       '          <input id="lg-amount" class="lg-enter-input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="金额" />' +
       '          <button class="btn" id="lg-ok" type="button">记一笔</button>' +
       '        </div>' +
-      '        <input id="lg-note" class="lg-enter-note" type="text" maxlength="20" placeholder="备注（可选）" />' +
-      '        <div class="lg-enter-hint" id="lg-enter-hint"></div>' +
       '      </div>' +
+      '      <input id="lg-note" class="lg-enter-note" type="text" maxlength="20" placeholder="备注（可选）" />' +
+      '      <div class="lg-enter-hint" id="lg-enter-hint"></div>' +
       '      <div class="lg-cats-title">选择类型（可选）</div>' +
       '      <div class="lg-cats" id="lg-cats"></div>' +
       '      <div class="lg-rec-title">记录（点一条可补类型）</div>' +
@@ -123,6 +121,7 @@ App.registerFeature({
     const noteInput = container.querySelector('#lg-note');
     const okBtn = container.querySelector('#lg-ok');
     const enterHint = container.querySelector('#lg-enter-hint');
+    const signEl = container.querySelector('#lg-enter-sign');
 
     // ---------- 余额 / 统计 ----------
     function paintBalance() {
@@ -280,6 +279,14 @@ App.registerFeature({
     }
 
     // ---------- 分类网格（选中高亮） ----------
+    // 输入框前的 +/− 符号随所选类型变化（收入 +，支出 −）
+    function updateSign() {
+      if (!signEl) return;
+      if (!pendingType) { signEl.textContent = '−'; signEl.className = 'lg-enter-sign'; return; }
+      const inc = pendingType.type === 'inc';
+      signEl.textContent = inc ? '+' : '−';
+      signEl.className = 'lg-enter-sign' + (inc ? ' inc' : '');
+    }
     function paintCats() {
       catsEl.innerHTML = CATS.map((c) =>
         '<button class="lg-cat' + (c.type === 'inc' ? ' inc' : '') +
@@ -288,6 +295,7 @@ App.registerFeature({
         '<span class="lg-cat-e">' + c.e + '</span><span class="lg-cat-n">' + c.n + '</span>' +
         '</button>'
       ).join('');
+      updateSign();
     }
     function updateHint() {
       if (!enterHint) return;

@@ -992,10 +992,14 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .lg-head { display: flex; align-items: center; justify-content: space-between; }
 .lg-head h2 { font-size: 22px; color: var(--text-strong); margin: 0; }
 .lg-bal {
-  display: flex; flex-direction: column; gap: 4px;
+  display: flex; flex-direction: column; gap: 6px;
   background: color-mix(in srgb, var(--accent) 14%, var(--card));
   border: 1px solid var(--border); border-radius: var(--radius);
   padding: 20px; box-shadow: var(--shadow-sm);
+}
+.lg-bal .lg-enter-row {
+  margin-top: 8px; padding-top: 12px;
+  border-top: 1px dashed var(--border);
 }
 .lg-bal-label { font-size: 13px; color: var(--muted); }
 .lg-bal-num { font-size: 34px; font-weight: 800; color: var(--text-strong); letter-spacing: .5px; }
@@ -2767,7 +2771,8 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
    ============================================================ */
 .lg-enter { margin: 4px 0 8px; }
 .lg-enter-row { display: flex; align-items: center; gap: 10px; }
-.lg-enter-sign { font-size: 20px; font-weight: 700; color: var(--text-strong); flex: none; }
+.lg-enter-sign { font-size: 22px; font-weight: 700; color: var(--text-strong); flex: none; }
+.lg-enter-sign.inc { color: var(--accent-deep); }
 .lg-enter-input {
   flex: 1 1 auto; min-width: 0;
   font-size: 22px; font-weight: 700; color: var(--text-strong);
