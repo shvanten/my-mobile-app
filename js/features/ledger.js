@@ -54,6 +54,8 @@ App.registerFeature({
     // 记账时选中的分类（可空）；正在补标签的记录 id（可空）
     let pendingType = null;
     let editingId = null;
+    // 各类型支出明细当前选中的周期：day / week / month
+    let typePeriod = 'month';
 
     // 余额
     function balance() {
@@ -221,6 +223,7 @@ App.registerFeature({
           b.addEventListener('click', () => {
             seg.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
             b.classList.add('on');
+            typePeriod = b.dataset.p;
             paintTypeBreakdown(b.dataset.p);
           });
         });
