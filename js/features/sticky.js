@@ -7,7 +7,7 @@ App.registerFeature({
   id: 'sticky',
   title: '便签',
   desc: '随手摘抄 · 备忘录便签',
-  icon: '📌',
+  icon: 'pin',
   color: '#e0a82e',
   render(container) {
     const KEY = 'sticky.v1';

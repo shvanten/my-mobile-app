@@ -2653,3 +2653,24 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   }
 }
 
+/* ============================================================
+   ▸ SVG 图标系统（P0：功能性 emoji → 单色线性 SVG，跨端一致）
+   ============================================================ */
+.ic {
+  width: 1.1em; height: 1.1em;
+  display: inline-block; flex: none;
+  vertical-align: -0.18em;
+  stroke: currentColor; fill: none;
+}
+.nav-icon .ic { width: 22px; height: 22px; }
+.nav-item.active .nav-icon .ic { color: #fff; }
+.welcome-emoji .ic { width: 52px; height: 52px; color: var(--accent-deep); }
+
+/* —— P1 排版：数字等宽对齐（余额 / 金额） —— */
+.lg-bal-num,
+.lg-cat-n,
+.lg-rec-amt { font-variant-numeric: tabular-nums; }
+
+/* —— P2 移动端安全区：侧栏底部避开 Home 指示条 —— */
+#sidebar { padding-bottom: env(safe-area-inset-bottom, 0); }
+

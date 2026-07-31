@@ -10,7 +10,7 @@ App.registerFeature({
   id: 'mood',
   title: '心情',
   desc: '每日心情记录',
-  icon: '🌈',
+  icon: 'mood',
   color: '#7aa6c2',
   render(container) {
     const KEY = 'mood.v1';

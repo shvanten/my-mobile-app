@@ -9,7 +9,7 @@ App.registerFeature({
   id: 'checkin',
   title: '打卡',
   desc: '日历与可视化打卡',
-  icon: '📅',
+  icon: 'calendar',
   color: '#6fa860',
   render(container) {
     const HABITS_KEY = 'checkin.habits.v1';

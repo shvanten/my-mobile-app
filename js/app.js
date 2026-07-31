@@ -61,7 +61,7 @@
       item.type = 'button';
       item.dataset.id = f.id;
       item.innerHTML =
-        '<span class="nav-icon">' + (f.icon || '📱') + '</span>' +
+        '<span class="nav-icon">' + App.icon(f.icon || 'pin') + '</span>' +
         '<span class="nav-label">' + escapeHtml(f.title || f.id) + '</span>';
       item.addEventListener('click', () => navigate(f.id));
       nav.appendChild(item);
@@ -80,7 +80,7 @@
     view.style.removeProperty('--accent');
     view.innerHTML =
       '<div class="welcome">' +
-      '  <div class="welcome-emoji">🌿</div>' +
+      '  <div class="welcome-emoji">' + App.icon('leaf') + '</div>' +
       '  <h2>我的应用</h2>' +
       '  <p class="muted">从左侧选择功能开始</p>' +
       '</div>';
@@ -243,6 +243,10 @@
   }
 
   // 暴露给功能模块使用的 API
-  const api = { registerFeature, navigate, getFeatures: () => features, toast, escapeHtml, confirm: confirmDialog, prompt: promptDialog, closeModal };
+  const api = { registerFeature, navigate, getFeatures: () => features, toast, escapeHtml, confirm: confirmDialog, prompt: promptDialog, closeModal,
+    icon: function (name, cls) {
+      return '<svg class="ic' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><use href="#ic-' + name + '"/></svg>';
+    },
+  };
   window.App = api;
 })();

@@ -8,7 +8,7 @@ App.registerFeature({
   id: 'ledger',
   title: '记账',
   desc: '记录收支与存款',
-  icon: '💰',
+  icon: 'wallet',
   color: '#c2a06a',
   render(container) {
     const KEY = 'ledger.v1';

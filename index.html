@@ -15,6 +15,20 @@
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+  <svg class="svg-sprite" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+    <symbol id="ic-book" viewBox="0 0 24 24"><path d="M12 6c-2-1.4-4.5-1.4-6.5 0v13c2-1.4 4.5-1.4 6.5 0 2-1.4 4.5-1.4 6.5 0V6c-2-1.4-4.5-1.4-6.5 0Z"/><path d="M12 6v13"/></symbol>
+    <symbol id="ic-note" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/></symbol>
+    <symbol id="ic-chart" viewBox="0 0 24 24"><path d="M5 19V10M10 19V5M15 19v-7M20 19V9"/></symbol>
+    <symbol id="ic-tag" viewBox="0 0 24 24"><path d="M3 12l8-8h7a2 2 0 0 1 2 2v7l-9 9z"/><circle cx="15" cy="8.5" r="1.3"/></symbol>
+    <symbol id="ic-doc" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3h6v1"/><path d="M9 10h6M9 14h6M9 18h4"/></symbol>
+    <symbol id="ic-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.4 1 2.5h6c0-1.1.3-1.8 1-2.5A6 6 0 0 0 12 3Z"/></symbol>
+    <symbol id="ic-calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/></symbol>
+    <symbol id="ic-wallet" viewBox="0 0 24 24"><path d="M3 7h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7v10a2 2 0 0 0 2 2h13"/><circle cx="17" cy="13" r="1.3"/></symbol>
+    <symbol id="ic-pin" viewBox="0 0 24 24"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/><path d="M12 14v6"/></symbol>
+    <symbol id="ic-mood" viewBox="0 0 24 24"><path d="M12 3l1.8 4.5L18 9l-4.2 1.5L12 15l-1.8-4.5L6 9l4.2-1.5z"/><path d="M18 14l.9 2.3L21 17l-2.1.7L18 20l-.9-2.3L15 17l2.1-.7z"/></symbol>
+    <symbol id="ic-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 6-14 14-14 0 8-6 14-14 14z"/><path d="M5 19c4-4 7-7 11-9"/></symbol>
+    <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  </svg>
   <div id="app">
     <!-- 左侧：功能导航单独成列 -->
     <aside id="sidebar">
@@ -25,7 +39,7 @@
       <nav id="side-nav"></nav>
       <div id="side-foot">
         <button id="nav-add" class="nav-item nav-add" type="button">
-          <span class="nav-icon">➕</span>
+          <span class="nav-icon"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><use href="#ic-plus"/></svg></span>
           <span class="nav-label">添加功能</span>
         </button>
       </div>
