@@ -248,6 +248,13 @@
 
   // PWA：支持「添加到主屏幕」后离线使用
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    // 新版本 Service Worker 接管页面后自动刷新，避免一直显示旧缓存版本
+    let swRefreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (swRefreshing) return;
+      swRefreshing = true;
+      window.location.reload();
+    });
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW 注册失败', e));
     });
