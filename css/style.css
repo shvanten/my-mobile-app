@@ -2762,3 +2762,51 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   .welcome { padding-top: 4vh; }
 }
 
+/* ============================================================
+   ▸ 记账：余额旁常驻输入区（替代原弹窗，避免软键盘错位）
+   ============================================================ */
+.lg-enter { margin: 4px 0 8px; }
+.lg-enter-row { display: flex; align-items: center; gap: 10px; }
+.lg-enter-sign { font-size: 20px; font-weight: 700; color: var(--text-strong); flex: none; }
+.lg-enter-input {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 22px; font-weight: 700; color: var(--text-strong);
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+}
+.lg-enter-input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.lg-enter-note {
+  width: 100%; margin-top: 8px; padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2);
+  font-size: 14px; color: var(--text);
+}
+.lg-enter-note:focus { outline: none; border-color: var(--accent); }
+.lg-enter-hint { margin-top: 8px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+/* 分类选中高亮 */
+.lg-cat.on {
+  background: color-mix(in srgb, var(--accent-deep) 16%, transparent);
+  color: var(--text-strong);
+  box-shadow: inset 0 0 0 2px var(--accent-deep);
+}
+
+/* 记录项：待分类 + 内联补标签条 */
+.lg-rec-item.no-cat { border: 1px dashed color-mix(in srgb, var(--muted) 55%, transparent); }
+.lg-rec-item.no-cat .lg-rec-cat { color: var(--muted); }
+.lg-rec-cats {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 4px 4px; margin-top: 2px;
+  border-top: 1px dashed var(--border);
+}
+.lg-rec-cat {
+  border: 1px solid var(--border); background: var(--card); color: var(--text);
+  font-size: 13px; padding: 7px 10px; border-radius: 11px; cursor: pointer;
+  transition: background .15s ease;
+}
+.lg-rec-cat.inc { color: var(--accent-deep); }
+.lg-rec-cat:active { background: color-mix(in srgb, var(--accent-deep) 12%, transparent); }
+

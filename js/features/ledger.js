@@ -1,8 +1,9 @@
 /**
  * 记账模块：
  * - 顶部显示当前存款（余额 = 初始存款 + 收入 - 支出）。
- * - 点击分类（饮食 / 交通 …）后在底部弹窗填数字即可生成一笔记录。
- * - 记录列表可删除；可设置初始存款。
+ * - 余额下方常驻「金额 / 备注」输入区，直接输入即可生成一笔记录（无需弹窗）。
+ * - 可先点分类（高亮）再记；也可不选分类直接记（记为「待分类」），之后在记录里补标签。
+ * - 记录列表点一条可展开内联分类条，补上或修改类型。
  */
 App.registerFeature({
   id: 'ledger',
@@ -21,7 +22,7 @@ App.registerFeature({
       } catch (e) {}
       return { init: 0, records: [] };
     }
-    function save() { localStorage.setItem(KEY, JSON.stringify(state)) }
+    function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
 
     let state = load();
     if (!Array.isArray(state.records)) state.records = [];
@@ -40,20 +41,19 @@ App.registerFeature({
       return (v < 0 ? '-' : '') + '¥' + withSep + '.' + dec;
     }
 
-    // 分类：type=exp 支出 / inc 收入
+    // 分类：type=exp 支出 / inc 收入（已移除「居住」）
     const CATS = [
       { e: '🍜', n: '饮食', type: 'exp' }, { e: '🚌', n: '交通', type: 'exp' },
       { e: '🛍️', n: '购物', type: 'exp' }, { e: '🎮', n: '娱乐', type: 'exp' },
-      { e: '🏠', n: '居住', type: 'exp' }, { e: '💊', n: '医疗', type: 'exp' },
+      { e: '💊', n: '医疗', type: 'exp' },
       { e: '📚', n: '学习', type: 'exp' }, { e: '🍿', n: '零食', type: 'exp' }, { e: '📦', n: '其他', type: 'exp' },
       { e: '💰', n: '工资', type: 'inc' }, { e: '🧧', n: '红包', type: 'inc' },
       { e: '📈', n: '理财', type: 'inc' }, { e: '➕', n: '其他收入', type: 'inc' },
     ];
 
-    // 当前弹窗选中的分类
-    let sheetCat = null;
-    // 各类型支出明细的切换周期：day | week | month
-    let typePeriod = 'month';
+    // 记账时选中的分类（可空）；正在补标签的记录 id（可空）
+    let pendingType = null;
+    let editingId = null;
 
     // 余额
     function balance() {
@@ -76,9 +76,18 @@ App.registerFeature({
       '        <span class="lg-bal-num" id="lg-bal-num">' + money(balance()) + '</span>' +
       '        <span class="lg-bal-sub" id="lg-bal-sub"></span>' +
       '      </div>' +
-      '      <div class="lg-cats-title">记一笔</div>' +
+      '      <div class="lg-enter">' +
+      '        <div class="lg-enter-row">' +
+      '          <span class="lg-enter-sign">¥</span>' +
+      '          <input id="lg-amount" class="lg-enter-input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="金额" />' +
+      '          <button class="btn" id="lg-ok" type="button">记一笔</button>' +
+      '        </div>' +
+      '        <input id="lg-note" class="lg-enter-note" type="text" maxlength="20" placeholder="备注（可选）" />' +
+      '        <div class="lg-enter-hint" id="lg-enter-hint"></div>' +
+      '      </div>' +
+      '      <div class="lg-cats-title">选择类型（可选）</div>' +
       '      <div class="lg-cats" id="lg-cats"></div>' +
-      '      <div class="lg-rec-title">记录</div>' +
+      '      <div class="lg-rec-title">记录（点一条可补类型）</div>' +
       '      <div class="lg-rec" id="lg-rec"></div>' +
       '    </div>' +
       '    <div class="lg-page" data-page="summary">' +
@@ -89,22 +98,6 @@ App.registerFeature({
       '  <div class="lg-pager" id="lg-pager">' +
       '    <span class="lg-pager-dot on" data-go="main"></span>' +
       '    <span class="lg-pager-dot" data-go="summary"></span>' +
-      '  </div>' +
-      '  <div class="lg-sheet" id="lg-sheet" hidden>' +
-      '    <div class="lg-sheet-backdrop"></div>' +
-      '    <div class="lg-sheet-box">' +
-      '      <div class="lg-sheet-head">' +
-      '        <span class="lg-sheet-cat" id="lg-sheet-cat"></span>' +
-      '        <span class="lg-sheet-type" id="lg-sheet-type"></span>' +
-      '      </div>' +
-      '      <div class="lg-amount"><span class="lg-amount-sign">¥</span>' +
-      '        <input id="lg-amount" class="lg-amount-input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" /></div>' +
-      '      <input id="lg-note" class="lg-note" type="text" maxlength="20" placeholder="备注（可选）" />' +
-      '      <div class="lg-sheet-actions">' +
-      '        <button class="btn ghost" id="lg-cancel" type="button">取消</button>' +
-      '        <button class="btn" id="lg-ok" type="button">记一笔</button>' +
-      '      </div>' +
-      '    </div>' +
       '  </div>' +
       '</div>';
 
@@ -124,11 +117,10 @@ App.registerFeature({
     const balSubEl = container.querySelector('#lg-bal-sub');
     const catsEl = container.querySelector('#lg-cats');
     const recEl = container.querySelector('#lg-rec');
-    const sheet = container.querySelector('#lg-sheet');
     const amountInput = container.querySelector('#lg-amount');
     const noteInput = container.querySelector('#lg-note');
-    const sheetCatEl = container.querySelector('#lg-sheet-cat');
-    const sheetTypeEl = container.querySelector('#lg-sheet-type');
+    const okBtn = container.querySelector('#lg-ok');
+    const enterHint = container.querySelector('#lg-enter-hint');
 
     // ---------- 余额 / 统计 ----------
     function paintBalance() {
@@ -143,7 +135,6 @@ App.registerFeature({
     }
 
     // ---------- 消费总结（周/月/平均） ----------
-    // 某天所在自然周（周一开头）的周一日期，作为周的 key
     function weekStart(dateStr) {
       const d = new Date(dateStr + 'T00:00:00');
       const dow = (d.getDay() + 6) % 7;   // 0=周一
@@ -159,9 +150,8 @@ App.registerFeature({
         return;
       }
       const t = todayStr();
-      // 按周 / 按月分组
-      const byWeek = {};   // { 周一日期: {exp,inc} }
-      const byMonth = {};  // { 'YYYY-MM': {exp,inc} }
+      const byWeek = {};
+      const byMonth = {};
       let firstDate = t, totalExp = 0;
       state.records.forEach((r) => {
         if (r.date < firstDate) firstDate = r.date;
@@ -172,7 +162,6 @@ App.registerFeature({
         if (r.type === 'inc') { byWeek[wk].inc += r.amount; byMonth[mo].inc += r.amount; }
         else { byWeek[wk].exp += r.amount; byMonth[mo].exp += r.amount; totalExp += r.amount; }
       });
-      // 平均：从第一笔记录到今天的跨度
       const msDay = 86400000;
       const spanDays = Math.max(1, Math.round((new Date(t + 'T00:00:00') - new Date(firstDate + 'T00:00:00')) / msDay) + 1);
       const spanWeeks = Math.max(1, Math.ceil(spanDays / 7));
@@ -181,7 +170,6 @@ App.registerFeature({
       const weekAvg = totalExp / spanWeeks;
       const monthAvg = totalExp / spanMonths;
 
-      // 每周总结：最近 6 个有记录的周（最近在前）
       const weekKeys = Object.keys(byWeek).sort().reverse().slice(0, 6);
       const curWeek = weekStart(t);
       const weekRows = weekKeys.map((wk) => {
@@ -194,7 +182,6 @@ App.registerFeature({
           '<span class="lg-sum-inc">收入 ' + money(byWeek[wk].inc) + '</span></div>';
       }).join('');
 
-      // 每月总结：最近 6 个有记录的月（最近在前）
       const monthKeys = Object.keys(byMonth).sort().reverse().slice(0, 6);
       const curMonth = t.slice(0, 7);
       const monthRows = monthKeys.map((mo) => {
@@ -227,7 +214,6 @@ App.registerFeature({
         '  <div id="lg-type-breakdown"></div>' +
         '</div>';
 
-      // 绑定分段切换
       const seg = sumEl.querySelector('#lg-type-seg');
       if (seg) {
         seg.querySelectorAll('button').forEach((b) => {
@@ -244,7 +230,6 @@ App.registerFeature({
 
     // 各类型支出明细：按 日/周/月 统计每个支出类型的总金额
     function paintTypeBreakdown(period) {
-      typePeriod = period;
       const box = container.querySelector('#lg-type-breakdown');
       if (!box) return;
       const t = todayStr();
@@ -291,17 +276,24 @@ App.registerFeature({
         }).join('');
     }
 
-    // ---------- 分类网格 ----------
+    // ---------- 分类网格（选中高亮） ----------
     function paintCats() {
       catsEl.innerHTML = CATS.map((c) =>
-        '<button class="lg-cat' + (c.type === 'inc' ? ' inc' : '') + '" type="button" ' +
+        '<button class="lg-cat' + (c.type === 'inc' ? ' inc' : '') +
+        (pendingType && pendingType.n === c.n ? ' on' : '') + '" type="button" ' +
         'data-cat="' + App.escapeHtml(c.n) + '">' +
         '<span class="lg-cat-e">' + c.e + '</span><span class="lg-cat-n">' + c.n + '</span>' +
         '</button>'
       ).join('');
     }
+    function updateHint() {
+      if (!enterHint) return;
+      enterHint.textContent = pendingType
+        ? ('已选「' + pendingType.n + '」，输入金额后点记一笔。')
+        : '直接输入金额即可记账（待分类）；也可先点上方类型。';
+    }
 
-    // ---------- 记录列表 ----------
+    // ---------- 记录列表（可展开补类型） ----------
     function paintRecords() {
       const list = state.records.slice().sort((a, b) => (b.date + b.id).localeCompare(a.date + b.id));
       if (!list.length) {
@@ -309,80 +301,106 @@ App.registerFeature({
         return;
       }
       recEl.innerHTML = list.map((r) => {
-        const cat = CATS.find((c) => c.n === r.cat) || { e: '📝', n: r.cat };
+        const cat = CATS.find((c) => c.n === r.cat) || { e: r.cat ? '🏷️' : '❓', n: r.cat || '待分类' };
         const sign = r.type === 'inc' ? '+' : '-';
         const cls = r.type === 'inc' ? ' inc' : ' exp';
+        const noCat = !r.cat;
         const note = r.note ? ' · ' + App.escapeHtml(r.note) : '';
-        return '<div class="lg-rec-item' + cls + '">' +
+        let html = '<div class="lg-rec-item' + cls + (noCat ? ' no-cat' : '') + '" data-id="' + r.id + '">' +
           '  <span class="lg-rec-e">' + cat.e + '</span>' +
-          '  <span class="lg-rec-meta"><span class="lg-rec-cat">' + App.escapeHtml(r.cat) +
-          '    </span><span class="lg-rec-date">' + r.date + note + '</span></span>' +
-          '  <span class="lg-rec-amt">' + sign + money(r.amount).replace('¥', '¥') + '</span>' +
+          '  <span class="lg-rec-meta"><span class="lg-rec-cat">' + App.escapeHtml(cat.n) + '</span>' +
+          '    <span class="lg-rec-date">' + r.date + note + '</span></span>' +
+          '  <span class="lg-rec-amt">' + sign + money(r.amount) + '</span>' +
           '  <button class="lg-rec-del" type="button" data-del="' + r.id + '" aria-label="删除">✕</button>' +
           '</div>';
+        if (editingId === r.id) {
+          html += '<div class="lg-rec-cats" data-id="' + r.id + '">' +
+            CATS.map((c) => '<button class="lg-rec-cat' + (c.type === 'inc' ? ' inc' : '') +
+              '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
+            '</div>';
+        }
+        return html;
       }).join('');
     }
 
-    // ---------- 底部弹窗 ----------
-    function openSheet(catName) {
-      const cat = CATS.find((c) => c.n === catName);
-      if (!cat) return;
-      sheetCat = cat;
-      sheetCatEl.textContent = cat.e + ' ' + cat.n;
-      sheetTypeEl.textContent = cat.type === 'inc' ? '收入' : '支出';
-      sheetTypeEl.className = 'lg-sheet-type ' + (cat.type === 'inc' ? 'inc' : 'exp');
-      amountInput.value = '';
-      noteInput.value = '';
-      sheet.hidden = false;
-      setTimeout(() => amountInput.focus(), 60);
-    }
-    function closeSheet() { sheet.hidden = true; sheetCat = null; }
-
-    catsEl.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-cat]');
-      if (!b) return;
-      openSheet(b.dataset.cat);
-    });
-
-    sheet.querySelector('#lg-cancel').addEventListener('click', closeSheet);
-    sheet.addEventListener('click', (e) => { if (e.target.classList.contains('lg-sheet-backdrop')) closeSheet(); });
-    sheet.querySelector('#lg-ok').addEventListener('click', () => {
-      if (!sheetCat) { closeSheet(); return; }
+    // ---------- 记一笔（常驻输入区，无需弹窗） ----------
+    function doRecord() {
       const amt = parseFloat(amountInput.value);
       if (!amt || amt <= 0) { App.toast('请输入金额'); return; }
+      const cat = pendingType;
       state.records.push({
         id: 'r' + Date.now(),
         date: todayStr(),
-        cat: sheetCat.n,
-        type: sheetCat.type,
+        cat: cat ? cat.n : '',
+        type: cat ? cat.type : 'exp',
         amount: Math.round(amt * 100) / 100,
         note: noteInput.value.trim(),
       });
       save();
-      closeSheet();
+      amountInput.value = '';
+      noteInput.value = '';
+      pendingType = null;
+      paintCats();
+      updateHint();
       paintBalance();
       paintRecords();
       paintSummary();
-      App.toast('已记一笔：' + sheetCat.n + ' ' + money(amt));
-    });
-    // 回车直接确认
-    amountInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sheet.querySelector('#lg-ok').click(); });
+      App.toast('已记一笔' + (cat ? '：' + cat.n : '（待分类）'));
+    }
+    okBtn.addEventListener('click', doRecord);
+    amountInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doRecord(); });
+    noteInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doRecord(); });
 
-    // ---------- 删除记录 ----------
-    recEl.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-del]');
+    // 分类网格：点选 / 取消
+    catsEl.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-cat]');
       if (!b) return;
-      const id = b.dataset.del;
-      const r = state.records.find((x) => x.id === id);
-      if (!r) return;
-      App.confirm('删除记录', '确认删除这笔「' + r.cat + ' ' + money(r.amount) + '」？', () => {
-        state.records = state.records.filter((x) => x.id !== id);
-        save();
-        paintBalance();
+      const c = CATS.find((x) => x.n === b.dataset.cat);
+      if (!c) return;
+      pendingType = (pendingType && pendingType.n === c.n) ? null : c;
+      paintCats();
+      updateHint();
+    });
+
+    // 记录列表：删除 / 补标签 / 展开
+    recEl.addEventListener('click', (e) => {
+      const del = e.target.closest('[data-del]');
+      if (del) {
+        const id = del.dataset.del;
+        const r = state.records.find((x) => x.id === id);
+        if (!r) return;
+        App.confirm('删除记录', '确认删除这笔「' + (r.cat || '待分类') + ' ' + money(r.amount) + '」？', () => {
+          state.records = state.records.filter((x) => x.id !== id);
+          save();
+          paintBalance();
+          paintRecords();
+          paintSummary();
+          App.toast('已删除');
+        });
+        return;
+      }
+      const catBtn = e.target.closest('.lg-rec-cat');
+      if (catBtn) {
+        const id = catBtn.closest('.lg-rec-cats').dataset.id;
+        const r = state.records.find((x) => x.id === id);
+        const c = CATS.find((x) => x.n === catBtn.dataset.cat);
+        if (r && c) {
+          r.cat = c.n; r.type = c.type;
+          save();
+          paintBalance();
+          paintRecords();
+          paintSummary();
+          App.toast('已设类型为 ' + c.n);
+        }
+        editingId = null;
+        return;
+      }
+      const item = e.target.closest('.lg-rec-item');
+      if (item) {
+        const id = item.dataset.id;
+        editingId = (editingId === id) ? null : id;
         paintRecords();
-        paintSummary();
-        App.toast('已删除');
-      });
+      }
     });
 
     // ---------- 设置存款（初始余额） ----------
@@ -401,5 +419,6 @@ App.registerFeature({
     paintCats();
     paintRecords();
     paintSummary();
+    updateHint();
   }
 });
