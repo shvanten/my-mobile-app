@@ -988,7 +988,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 /* ============================================================
    记账（ledger）
    ============================================================ */
-.lg { display: flex; flex-direction: column; gap: 16px; max-width: 560px; margin: 0 auto; }
+.lg { display: flex; flex-direction: column; gap: 16px; max-width: 560px; margin: 0 auto; height: 100%; min-height: 0; }
 .lg-head { display: flex; align-items: center; justify-content: space-between; }
 .lg-head h2 { font-size: 22px; color: var(--text-strong); margin: 0; }
 .lg-bal {
@@ -1852,8 +1852,9 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   padding-bottom: 20px;
 }
 .mo-page-tall::-webkit-scrollbar { display: none; }
-/* ledger page 不需要窗口滚动 */
-.lg-page { overflow: visible; }
+/* ledger page 自身竖向滚动（外层 #view 不再承担，避免被横滑容器吞掉竖向手势） */
+.lg-page { overflow-y: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.lg-page::-webkit-scrollbar { display: none; }
 .mo-pager,
 .lg-pager {
   display: flex; gap: 6px; justify-content: center;
