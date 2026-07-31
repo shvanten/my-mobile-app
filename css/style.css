@@ -48,7 +48,7 @@ html[data-theme="dark"] {
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; }
+html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; position: relative; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   background: var(--bg);
@@ -59,10 +59,12 @@ body {
 
 /* ===== 整体：左侧栏 + 右侧内容，横向铺满 ===== */
 #app {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
   display: flex;
   flex-direction: row;
   width: 100%;
-  height: 100dvh;
+  height: 100%;
   background: var(--bg);
   overflow: hidden;
 }
