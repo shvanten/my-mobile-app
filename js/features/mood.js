@@ -143,14 +143,12 @@ App.registerFeature({
         (has
           ? '<div class="mo-items">' + itemCards + '</div>'
           : '<div class="mo-today-empty muted">今天还没记录心情</div>') +
-        '<button class="btn block sm" id="mo-add" type="button">＋ 添加一条心情</button>' +
-        '<div class="mo-today-editor" id="mo-today-editor" hidden>' +
+        '<div class="mo-today-editor" id="mo-today-editor">' +
         '  <div class="mo-edit-title" id="mo-edit-title">添加心情</div>' +
         '  <div class="mo-moods" id="mo-moods"></div>' +
         '  <textarea id="mo-note" class="mo-note" maxlength="200" rows="2" placeholder="这个情况是怎么回事？（每条心情各自的情况说明，可选）"></textarea>' +
         '  <div class="mo-today-actions">' +
-        '    <button class="btn ghost" id="mo-cancel-today" type="button">取消</button>' +
-        '    <button class="btn" id="mo-save-today" type="button">保存</button>' +
+        '    <button class="btn" id="mo-save-today" type="button">保存这条</button>' +
         '  </div>' +
         '</div>';
 
@@ -181,7 +179,6 @@ App.registerFeature({
     function openEditor(mode, idx) {
       editorMode = mode; editIdx = idx;
       const titleEl = container.querySelector('#mo-edit-title');
-      const editor = container.querySelector('#mo-today-editor');
       const ne = container.querySelector('#mo-note');
       if (mode === 'add') {
         selMood = null;
@@ -194,12 +191,13 @@ App.registerFeature({
         titleEl.textContent = '编辑 · ' + moodName(it.e);
         if (ne) ne.value = it.note || '';
       }
-      editor.hidden = false;
       renderMoodButtons();
+      // 编辑器始终展开，编辑时滚到它
+      const editor = container.querySelector('#mo-today-editor');
+      if (editor && editor.scrollIntoView) editor.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     function closeEditor() {
-      const editor = container.querySelector('#mo-today-editor');
-      if (editor) editor.hidden = true;
+      // 编辑器始终展开，关闭时仅清空状态、不再隐藏
       editorMode = 'add'; editIdx = -1; selMood = null;
     }
 
@@ -213,12 +211,16 @@ App.registerFeature({
         data[t].items.push({ e: selMood, note: note });
       } else {
         const it = data[t].items[editIdx];
-        if (!it) { closeEditor(); return; }
+        if (!it) { closeEditor(); renderTodayCard(); return; }
         it.e = selMood; it.note = note;
       }
       save();
       App.toast(editorMode === 'add' ? '已添加这条心情 🌈' : '已更新');
       closeEditor();
+      // 清空表单（编辑器始终展开）
+      const noteEl = container.querySelector('#mo-note');
+      if (noteEl) noteEl.value = '';
+      selMood = null;
       renderTodayCard();
       renderCalendar();
       renderSummary();
@@ -226,13 +228,10 @@ App.registerFeature({
 
     // 今天卡片内的事件（委托在 todayCardEl 上，仅绑定一次）
     todayCardEl.addEventListener('click', (e) => {
-      const addBtn = e.target.closest('#mo-add');
       const editBtn = e.target.closest('[data-edit]');
       const delBtn = e.target.closest('[data-del]');
-      const cancelBtn = e.target.closest('#mo-cancel-today');
       const saveBtn = e.target.closest('#mo-save-today');
       const delDayBtn = e.target.closest('#mo-del-today');
-      if (addBtn) { openEditor('add', -1); return; }
       if (editBtn) { openEditor('edit', parseInt(editBtn.dataset.edit, 10)); return; }
       if (delBtn) {
         const idx = parseInt(delBtn.dataset.del, 10);
@@ -255,7 +254,6 @@ App.registerFeature({
         });
         return;
       }
-      if (cancelBtn) { closeEditor(); return; }
       if (saveBtn) { saveItem(); return; }
     });
 
