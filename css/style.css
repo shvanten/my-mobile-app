@@ -2519,3 +2519,137 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .sy-ol b { color: var(--text-strong); }
 .sy-ol code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; color: var(--accent-deep); }
 
+/* ============================================================
+   ▸ UI 升级层（追加）：卡片悬浮 · 页面过渡 · 榜单切换动画
+   - 仅追加样式，不动原有结构与取值，确保现有功能零回归
+   - 动效令牌统一；红涨绿跌配色保持不变
+   ============================================================ */
+
+:root {
+  --ease: cubic-bezier(.22, .61, .36, 1);
+  --dur: .34s;
+  --lift: -3px;
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
+  --elev-hover: 0 14px 30px rgba(40, 70, 50, .16);
+  --elev-press: 0 4px 12px rgba(40, 70, 50, .12);
+}
+
+/* —— 通用卡片：悬浮抬升 + 阴影 + 描边高亮 —— */
+.nn-rank-item,
+.mo-week-row,
+.lg-sum-row,
+.todo-item,
+.ci-part,
+.st-note,
+.nn-book,
+.nn-shelf-item {
+  transition: transform var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease),
+              border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease);
+  will-change: transform;
+}
+.nn-rank-item:hover,
+.mo-week-row:hover,
+.lg-sum-row:hover,
+.todo-item:hover,
+.ci-part:hover,
+.st-note:hover,
+.nn-book:hover,
+.nn-shelf-item:hover {
+  transform: translateY(var(--lift));
+  box-shadow: var(--elev-hover);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--card) 70%, var(--accent) 6%);
+}
+
+/* —— 按钮：悬浮微抬 + 按压回弹 —— */
+.btn { transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), opacity .15s ease; }
+.btn:hover { transform: translateY(-1px); box-shadow: 0 10px 22px color-mix(in srgb, var(--accent-deep) 34%, transparent); }
+.btn:active { transform: scale(.97); opacity: .92; }
+
+/* —— 榜单条目：每次切换榜单重放入场（错峰） —— */
+@keyframes rankItemIn {
+  from { opacity: 0; transform: translateY(12px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+.nn-rank-item { animation: rankItemIn .44s var(--ease) both; }
+.nn-rank-item:nth-child(1)  { animation-delay: .00s; }
+.nn-rank-item:nth-child(2)  { animation-delay: .04s; }
+.nn-rank-item:nth-child(3)  { animation-delay: .08s; }
+.nn-rank-item:nth-child(4)  { animation-delay: .12s; }
+.nn-rank-item:nth-child(5)  { animation-delay: .16s; }
+.nn-rank-item:nth-child(6)  { animation-delay: .20s; }
+.nn-rank-item:nth-child(7)  { animation-delay: .24s; }
+.nn-rank-item:nth-child(8)  { animation-delay: .28s; }
+.nn-rank-item:nth-child(9)  { animation-delay: .32s; }
+.nn-rank-item:nth-child(10) { animation-delay: .36s; }
+
+/* —— 顶部榜单切换导航：激活辉光 + 按压 —— */
+.nn-nav-rank-btn.on {
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 32%, transparent);
+  transform: translateY(-1px);
+}
+.nn-nav-rank-btn:active { transform: scale(.95); }
+
+/* —— 面板切换整体淡入（榜单重渲染即触发） —— */
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.nn-rank { animation: panelIn .4s var(--ease) both; }
+
+/* —— 页面过渡（初始进入） —— */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.feature { animation: pageIn .42s var(--ease) both; }
+
+/* —— 焦点可见（无障碍） —— */
+.nn-rank-item:focus-visible,
+.nn-nav-rank-btn:focus-visible,
+.nav-item:focus-visible,
+.btn:focus-visible,
+.mo-cal-nav:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* —— 模块卡片入场（mood / 账本 / 签到 / 便签） —— */
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: none; }
+}
+.mo-week-row,
+.lg-sum-row,
+.ci-part,
+.st-note { animation: cardIn .45s var(--ease) both; }
+.mo-week-row:nth-child(1) { animation-delay: .02s; }
+.mo-week-row:nth-child(2) { animation-delay: .06s; }
+.mo-week-row:nth-child(3) { animation-delay: .10s; }
+.lg-sum-row:nth-child(1) { animation-delay: .02s; }
+.lg-sum-row:nth-child(2) { animation-delay: .06s; }
+.lg-sum-row:nth-child(3) { animation-delay: .10s; }
+.ci-part:nth-child(1) { animation-delay: .02s; }
+.ci-part:nth-child(2) { animation-delay: .06s; }
+.ci-part:nth-child(3) { animation-delay: .10s; }
+
+/* —— 尊重「减少动态效果」无障碍偏好 —— */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  .nn-rank-item,
+  .mo-week-row,
+  .lg-sum-row,
+  .ci-part,
+  .st-note,
+  .nn-book,
+  .nn-shelf-item,
+  .feature,
+  .nn-rank {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
