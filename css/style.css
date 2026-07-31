@@ -48,7 +48,9 @@ html[data-theme="dark"] {
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; position: relative; }
+html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; }
+html { position: fixed; inset: 0; }
+body { position: relative; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   background: var(--bg);
@@ -1031,7 +1033,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .lg-rec-del:hover { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--text); }
 
 /* 底部记账弹窗 */
-.lg-sheet { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
+.lg-sheet { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; overscroll-behavior: contain; }
 .lg-sheet[hidden] { display: none; }
 .lg-sheet-backdrop { position: absolute; inset: 0; background: rgba(20, 30, 22, .32); }
 .lg-sheet-box {
