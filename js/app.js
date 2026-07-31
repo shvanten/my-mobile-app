@@ -51,6 +51,14 @@
   // ===== DOM 引用 =====
   const view = document.getElementById('view');
   const nav = document.getElementById('side-nav');
+  const sidebarEl = document.getElementById('sidebar');
+  const backdropEl = document.getElementById('side-backdrop');
+  const menuBtn = document.getElementById('menu-btn');
+
+  // ===== 左侧导航抽屉（默认隐藏，菜单按钮抽出 / 切界面后收起） =====
+  function openDrawer() { sidebarEl.classList.add('open'); backdropEl.classList.add('show'); menuBtn.setAttribute('aria-expanded', 'true'); }
+  function closeDrawer() { sidebarEl.classList.remove('open'); backdropEl.classList.remove('show'); menuBtn.setAttribute('aria-expanded', 'false'); }
+  function toggleDrawer() { sidebarEl.classList.toggle('open'); backdropEl.classList.toggle('show'); menuBtn.setAttribute('aria-expanded', sidebarEl.classList.contains('open') ? 'true' : 'false'); }
 
   // ===== 左侧导航 =====
   function buildSidebar() {
@@ -63,7 +71,7 @@
       item.innerHTML =
         '<span class="nav-icon">' + App.icon(f.icon || 'pin') + '</span>' +
         '<span class="nav-label">' + escapeHtml(f.title || f.id) + '</span>';
-      item.addEventListener('click', () => navigate(f.id));
+      item.addEventListener('click', () => { navigate(f.id); closeDrawer(); });
       nav.appendChild(item);
     });
   }
@@ -82,7 +90,7 @@
       '<div class="welcome">' +
       '  <div class="welcome-emoji">' + App.icon('leaf') + '</div>' +
       '  <h2>我的应用</h2>' +
-      '  <p class="muted">从左侧选择功能开始</p>' +
+      '  <p class="muted">点左上角菜单按钮，选择功能开始</p>' +
       '</div>';
   }
 
@@ -107,6 +115,7 @@
 
   function render() {
     buildSidebar();
+    closeDrawer();
     const route = parseRoute();
     if (route.name === 'feature') renderFeature(route.id);
     else renderHome();
@@ -229,6 +238,8 @@
   // 因此放进 render()（在 DOMContentLoaded / hashchange 时统一调用），不要在这里直接调。
   document.getElementById('theme-btn').addEventListener('click', toggleTheme);
   document.getElementById('nav-add').addEventListener('click', showAddHint);
+  menuBtn.addEventListener('click', toggleDrawer);
+  backdropEl.addEventListener('click', closeDrawer);
   window.addEventListener('hashchange', render);
 
   applyTheme(getPreferredTheme());

@@ -45,13 +45,15 @@ App.registerFeature({
       { e: '🍜', n: '饮食', type: 'exp' }, { e: '🚌', n: '交通', type: 'exp' },
       { e: '🛍️', n: '购物', type: 'exp' }, { e: '🎮', n: '娱乐', type: 'exp' },
       { e: '🏠', n: '居住', type: 'exp' }, { e: '💊', n: '医疗', type: 'exp' },
-      { e: '📚', n: '学习', type: 'exp' }, { e: '📦', n: '其他', type: 'exp' },
+      { e: '📚', n: '学习', type: 'exp' }, { e: '🍿', n: '零食', type: 'exp' }, { e: '📦', n: '其他', type: 'exp' },
       { e: '💰', n: '工资', type: 'inc' }, { e: '🧧', n: '红包', type: 'inc' },
       { e: '📈', n: '理财', type: 'inc' }, { e: '➕', n: '其他收入', type: 'inc' },
     ];
 
     // 当前弹窗选中的分类
     let sheetCat = null;
+    // 各类型支出明细的切换周期：day | week | month
+    let typePeriod = 'month';
 
     // 余额
     function balance() {
@@ -213,7 +215,80 @@ App.registerFeature({
         '<div class="lg-sum-row head"><span>每周总结</span><span></span><span></span></div>' +
         '<div class="lg-sum-table">' + weekRows + '</div>' +
         '<div class="lg-sum-row head"><span>每月总结</span><span></span><span></span></div>' +
-        '<div class="lg-sum-table">' + monthRows + '</div>';
+        '<div class="lg-sum-table">' + monthRows + '</div>' +
+        '<div class="lg-type-section">' +
+        '  <div class="lg-sum-sec-head"><h3>各类型支出</h3>' +
+        '    <div class="lg-seg" id="lg-type-seg">' +
+        '      <button type="button" data-p="day">日</button>' +
+        '      <button type="button" data-p="week">周</button>' +
+        '      <button type="button" data-p="month">月</button>' +
+        '    </div>' +
+        '  </div>' +
+        '  <div id="lg-type-breakdown"></div>' +
+        '</div>';
+
+      // 绑定分段切换
+      const seg = sumEl.querySelector('#lg-type-seg');
+      if (seg) {
+        seg.querySelectorAll('button').forEach((b) => {
+          b.classList.toggle('on', b.dataset.p === typePeriod);
+          b.addEventListener('click', () => {
+            seg.querySelectorAll('button').forEach((x) => x.classList.remove('on'));
+            b.classList.add('on');
+            paintTypeBreakdown(b.dataset.p);
+          });
+        });
+      }
+      paintTypeBreakdown(typePeriod);
+    }
+
+    // 各类型支出明细：按 日/周/月 统计每个支出类型的总金额
+    function paintTypeBreakdown(period) {
+      typePeriod = period;
+      const box = container.querySelector('#lg-type-breakdown');
+      if (!box) return;
+      const t = todayStr();
+      const expCats = CATS.filter((c) => c.type === 'exp');
+      const totals = {};
+      let periodTotal = 0;
+      state.records.forEach((r) => {
+        if (r.type !== 'exp') return;
+        let inP = false;
+        if (period === 'day') inP = r.date === t;
+        else if (period === 'week') inP = weekStart(r.date) === weekStart(t);
+        else inP = r.date.slice(0, 7) === t.slice(0, 7);
+        if (inP) { totals[r.cat] = (totals[r.cat] || 0) + r.amount; periodTotal += r.amount; }
+      });
+      const rows = expCats.map((c) => ({ c: c, amt: totals[c.n] || 0 }))
+        .filter((x) => x.amt > 0)
+        .sort((a, b) => b.amt - a.amt);
+      if (!rows.length) {
+        box.innerHTML = '<p class="muted" style="margin:6px 0 0">本期还没有支出记录。</p>';
+        return;
+      }
+      const max = rows[0].amt;
+      let periodLabel;
+      if (period === 'day') periodLabel = '今日 ' + t;
+      else if (period === 'week') {
+        const d = new Date(weekStart(t) + 'T00:00:00');
+        d.setDate(d.getDate() + 6);
+        periodLabel = '本周 ' + shortMD(weekStart(t)) + '–' + shortMD(fmt(d));
+      } else {
+        periodLabel = '本月 ' + parseInt(t.slice(5, 7), 10) + '月';
+      }
+      box.innerHTML =
+        '<div class="lg-type-label">' + periodLabel + ' · 支出合计 <b>' + money(periodTotal) + '</b>（' + rows.length + ' 类）</div>' +
+        rows.map((x) => {
+          const pct = max ? Math.round(x.amt / max * 100) : 0;
+          const share = periodTotal ? Math.round(x.amt / periodTotal * 100) : 0;
+          return '<div class="lg-type-row">' +
+            '<span class="lg-type-e">' + x.c.e + '</span>' +
+            '<span class="lg-type-n">' + App.escapeHtml(x.c.n) + '</span>' +
+            '<span class="lg-type-amt">' + money(x.amt) + '</span>' +
+            '<span class="lg-type-bar"><i style="width:' + pct + '%"></i></span>' +
+            '<span class="lg-type-share">' + share + '%</span>' +
+            '</div>';
+        }).join('');
     }
 
     // ---------- 分类网格 ----------

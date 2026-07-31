@@ -28,9 +28,16 @@
     <symbol id="ic-mood" viewBox="0 0 24 24"><path d="M12 3l1.8 4.5L18 9l-4.2 1.5L12 15l-1.8-4.5L6 9l4.2-1.5z"/><path d="M18 14l.9 2.3L21 17l-2.1.7L18 20l-.9-2.3L15 17l2.1-.7z"/></symbol>
     <symbol id="ic-leaf" viewBox="0 0 24 24"><path d="M5 19c0-8 6-14 14-14 0 8-6 14-14 14z"/><path d="M5 19c4-4 7-7 11-9"/></symbol>
     <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="ic-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
   </svg>
   <div id="app">
-    <!-- 左侧：功能导航单独成列 -->
+    <!-- 左侧导航抽屉的唤出按钮（默认隐藏抽屉，点此抽出） -->
+    <button id="menu-btn" class="icon-btn" type="button" aria-label="打开功能菜单">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><use href="#ic-menu"/></svg>
+    </button>
+    <!-- 抽屉打开时的遮罩，点它收起 -->
+    <div id="side-backdrop"></div>
+    <!-- 左侧：功能导航抽屉（默认隐藏，由菜单按钮抽出） -->
     <aside id="sidebar">
       <div id="side-head">
         <h1 id="side-title">我的应用</h1>
