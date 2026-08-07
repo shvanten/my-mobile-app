@@ -2821,6 +2821,7 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   transition: background .15s ease;
 }
 .lg-rec-cat.inc { color: var(--accent-deep); }
+.lg-rec-cat.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, var(--card)); font-weight: 600; }
 .lg-rec-cat:active { background: color-mix(in srgb, var(--accent-deep) 12%, transparent); }
 
 /* 各账户余额卡片（始终可见，不点余额也能看到） */
@@ -2884,4 +2885,72 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   .lg-bal-label { font-size: 12px; }
   .lg-enter-input { font-size: 19px; }
 }
+
+/* ===== 记账日历 ===== */
+.lg-cal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 6px 10px;
+}
+.lg-cal-head #lg-cal-title { font-weight: 600; font-size: 15px; }
+.lg-cal-head .btn { min-width: 38px; padding: 6px 10px; font-size: 18px; line-height: 1; }
+.lg-cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 4px; padding: 0 2px;
+}
+.lg-cal-headrow { margin-bottom: 4px; }
+.lg-cal-headrow span {
+  text-align: center; font-size: 11px; color: var(--muted);
+}
+.lg-cal-cell {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 2px; cursor: pointer;
+  font-size: 12px; color: var(--text);
+  overflow: hidden;
+}
+.lg-cal-cell.empty { visibility: hidden; border: none; background: none; }
+.lg-cal-cell.has { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.lg-cal-cell.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.lg-cal-cell.sel { background: var(--accent); color: #fff; border-color: var(--accent); }
+.lg-cal-d { font-weight: 600; line-height: 1; }
+.lg-cal-net {
+  font-size: 9px; margin-top: 2px; line-height: 1;
+  color: var(--muted); max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lg-cal-net.inc { color: #2e7d32; }
+.lg-cal-net.exp { color: #c0392b; }
+.lg-cal-cell.sel .lg-cal-net.inc { color: #e8f5e9; }
+.lg-cal-cell.sel .lg-cal-net.exp { color: #ffebee; }
+.lg-cal-detail { padding: 12px 2px 4px; }
+.lg-cal-detail-head {
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  padding: 6px 4px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
+}
+.lg-cal-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 4px; border-bottom: 1px solid var(--border);
+}
+.lg-cal-item-e { font-size: 18px; flex: 0 0 auto; }
+.lg-cal-item-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lg-cal-item-cat { font-size: 14px; }
+.lg-cal-item-acc { font-size: 11px; color: var(--muted); }
+.lg-cal-item-amt { font-weight: 700; flex: 0 0 auto; }
+.lg-cal-item.inc .lg-cal-item-amt { color: #2e7d32; }
+.lg-cal-item.exp .lg-cal-item-amt { color: #c0392b; }
+
+/* ===== 记录编辑表单 ===== */
+.lg-rec-edit {
+  margin: 6px 4px 10px; padding: 10px;
+  border: 1px dashed var(--border); border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 80%, var(--accent) 4%);
+}
+.lg-edit-label { font-size: 12px; color: var(--muted); margin: 8px 2px 4px; }
+.lg-rec-edit .ci-field { margin: 6px 0; }
+.lg-rec-edit-actions { display: flex; gap: 8px; margin-top: 10px; }
+.lg-rec-edit-actions .btn { flex: 1; }
 

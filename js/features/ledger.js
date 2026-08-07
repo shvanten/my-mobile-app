@@ -130,18 +130,28 @@ App.registerFeature({
       '      <div class="lg-cats" id="lg-cats"></div>' +
       '      <div class="lg-accts-title">账户（这笔钱来自 / 存入）</div>' +
       '      <div class="lg-accts" id="lg-accts"></div>' +
-      '      <div class="lg-rec-title">记录（点一条可补类型 / 账户）</div>' +
+      '      <div class="lg-rec-title">今日记录（点一条可编辑日期 / 金额 / 类型 / 账户）</div>' +
       '      <div class="lg-rec" id="lg-rec"></div>' +
-      '    </div>' +
-      '    <div class="lg-page" data-page="summary">' +
+'    </div>' +
+'    <div class="lg-page" data-page="calendar">' +
+'      <div class="lg-cal-head">' +
+'        <button class="btn ghost" id="lg-cal-prev" type="button" aria-label="上个月">‹</button>' +
+'        <span id="lg-cal-title"></span>' +
+'        <button class="btn ghost" id="lg-cal-next" type="button" aria-label="下个月">›</button>' +
+'      </div>' +
+'      <div class="lg-cal" id="lg-cal"></div>' +
+'      <div class="lg-cal-detail" id="lg-cal-detail"></div>' +
+'    </div>' +
+'    <div class="lg-page" data-page="summary">' +
       '      <div class="lg-cats-title">消费总结</div>' +
       '      <div class="lg-sum" id="lg-sum"></div>' +
       '    </div>' +
       '  </div>' +
       '  <div class="lg-pager" id="lg-pager">' +
-      '    <span class="lg-pager-dot on" data-go="main"></span>' +
-      '    <span class="lg-pager-dot" data-go="summary"></span>' +
-      '  </div>' +
+'    <span class="lg-pager-dot on" data-go="main"></span>' +
+'    <span class="lg-pager-dot" data-go="calendar"></span>' +
+'    <span class="lg-pager-dot" data-go="summary"></span>' +
+'  </div>' +
       '  <div class="ci-modal" id="lg-acct-set" hidden>' +
       '    <div class="ci-modal-box">' +
       '      <h3>设置各账户初始余额</h3>' +
@@ -162,9 +172,8 @@ App.registerFeature({
       const i = Math.round(pagesEl.scrollLeft / pagesEl.clientWidth);
       pagerEl.querySelectorAll('.lg-pager-dot').forEach((d, idx) => d.classList.toggle('on', idx === i));
     });
-    pagerEl.querySelectorAll('.lg-pager-dot').forEach((d) => d.addEventListener('click', () => {
-      const i = d.dataset.go === 'summary' ? 1 : 0;
-      pagesEl.scrollTo({ left: i * pagesEl.clientWidth, behavior: 'smooth' });
+    pagerEl.querySelectorAll('.lg-pager-dot').forEach((d, idx) => d.addEventListener('click', () => {
+      pagesEl.scrollTo({ left: idx * pagesEl.clientWidth, behavior: 'smooth' });
     }));
 
     const balNumEl = container.querySelector('#lg-bal-num');
@@ -382,9 +391,11 @@ App.registerFeature({
 
     // ---------- 记录列表（可展开补类型） ----------
     function paintRecords() {
-      const list = state.records.slice().sort((a, b) => (b.date + b.id).localeCompare(a.date + b.id));
+      const today = todayStr();
+      const list = state.records.filter((r) => r.date === today)
+        .sort((a, b) => b.id.localeCompare(a.id));
       if (!list.length) {
-        recEl.innerHTML = '<p class="muted ci-empty">还没有记账记录。</p>';
+        recEl.innerHTML = '<p class="muted ci-empty">今天还没有记账，上面记一笔吧。</p>';
         return;
       }
       recEl.innerHTML = list.map((r) => {
@@ -402,13 +413,23 @@ App.registerFeature({
           '  <button class="lg-rec-del" type="button" data-del="' + r.id + '" aria-label="删除">✕</button>' +
           '</div>';
         if (editingId === r.id) {
-          html += '<div class="lg-rec-cats" data-id="' + r.id + '">' +
+          html += '<div class="lg-rec-edit" data-id="' + r.id + '">' +
+            '  <div class="ci-field"><span>日期</span><input type="date" class="lg-edit-date" value="' + r.date + '"></div>' +
+            '  <div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-edit-amt" value="' + r.amount + '"></div>' +
+            '  <div class="lg-edit-label">类型</div>' +
+            '  <div class="lg-rec-cats">' +
             CATS.map((c) => '<button class="lg-rec-cat' + (c.type === 'inc' ? ' inc' : '') +
-              '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
-            '</div>';
-          html += '<div class="lg-rec-accts" data-id="' + r.id + '">' +
+              (r.cat === c.n ? ' on' : '') + '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
+            '</div>' +
+            '  <div class="lg-edit-label">账户</div>' +
+            '  <div class="lg-rec-accts">' +
             ACCOUNTS.map((a) => '<button class="lg-rec-acct' + (r.account === a.k ? ' on' : '') +
               '" type="button" data-acct="' + a.k + '">' + a.e + ' ' + a.n + '</button>').join('') +
+            '</div>' +
+            '  <div class="lg-rec-edit-actions">' +
+            '    <button class="btn ghost" type="button" data-edit-cancel="' + r.id + '">取消</button>' +
+            '    <button class="btn" type="button" data-edit-save="' + r.id + '">保存</button>' +
+            '  </div>' +
             '</div>';
         }
         return html;
@@ -473,43 +494,74 @@ App.registerFeature({
         App.confirm('删除记录', '确认删除这笔「' + (r.cat || '待分类') + ' ' + money(r.amount) + '」？', () => {
           state.records = state.records.filter((x) => x.id !== id);
           save();
+          editingId = null;
           paintBalance();
           paintRecords();
           paintSummary();
+          paintCalendar();
           App.toast('已删除');
         });
         return;
       }
+      const saveBtn = e.target.closest('[data-edit-save]');
+      if (saveBtn) {
+        const id = saveBtn.dataset.editSave;
+        const r = state.records.find((x) => x.id === id);
+        const block = saveBtn.closest('.lg-rec-edit');
+        if (r && block) {
+          const dateVal = block.querySelector('.lg-edit-date').value;
+          const amtVal = parseFloat(block.querySelector('.lg-edit-amt').value);
+          if (!dateVal) { App.toast('请选择日期'); return; }
+          if (!amtVal || amtVal <= 0) { App.toast('请输入有效金额'); return; }
+          const catBtn = block.querySelector('.lg-rec-cat.on');
+          const acctBtn = block.querySelector('.lg-rec-acct.on');
+          const cat = catBtn ? CATS.find((c) => c.n === catBtn.dataset.cat) : null;
+          const accK = acctBtn ? acctBtn.dataset.acct : r.account;
+          r.date = dateVal;
+          r.amount = Math.round(amtVal * 100) / 100;
+          if (cat) { r.cat = cat.n; r.type = cat.type; }
+          r.account = accK;
+          save();
+          editingId = null;
+          paintBalance();
+          paintRecords();
+          paintSummary();
+          paintCalendar();
+          App.toast('已保存修改');
+        }
+        return;
+      }
+      const cancelBtn = e.target.closest('[data-edit-cancel]');
+      if (cancelBtn) {
+        editingId = null;
+        paintRecords();
+        return;
+      }
       const catBtn = e.target.closest('.lg-rec-cat');
       if (catBtn) {
-        const id = catBtn.closest('.lg-rec-cats').dataset.id;
-        const r = state.records.find((x) => x.id === id);
+        const block = catBtn.closest('.lg-rec-edit');
+        const r = state.records.find((x) => x.id === block.dataset.id);
         const c = CATS.find((x) => x.n === catBtn.dataset.cat);
         if (r && c) {
           r.cat = c.n; r.type = c.type;
           save();
-          paintBalance();
-          paintRecords();
-          paintSummary();
-          App.toast('已设类型为 ' + c.n);
+          paintBalance(); paintSummary(); paintCalendar(); paintRecords();
         }
-        editingId = null;
         return;
       }
       const acctBtn = e.target.closest('.lg-rec-acct');
       if (acctBtn) {
-        const id = acctBtn.closest('.lg-rec-accts').dataset.id;
-        const r = state.records.find((x) => x.id === id);
+        const block = acctBtn.closest('.lg-rec-edit');
+        const r = state.records.find((x) => x.id === block.dataset.id);
         const k = acctBtn.dataset.acct;
         if (r && k) {
           r.account = k; save();
-          paintBalance(); paintRecords(); paintSummary();
-          App.toast('已改账户为 ' + ((ACCOUNTS.find((a) => a.k === k) || {}).n || k));
+          paintBalance(); paintSummary(); paintCalendar(); paintRecords();
         }
         return;
       }
       const item = e.target.closest('.lg-rec-item');
-      if (item) {
+      if (item && !e.target.closest('.lg-rec-edit')) {
         const id = item.dataset.id;
         editingId = (editingId === id) ? null : id;
         paintRecords();
@@ -542,12 +594,98 @@ App.registerFeature({
       App.toast('已设置各账户初始余额');
     });
 
+    // ---------- 记账日历 ----------
+    let calY = new Date().getFullYear();
+    let calM = new Date().getMonth();   // 0-11
+    let selDay = todayStr();
+
+    function paintCalendar() {
+      const calEl = container.querySelector('#lg-cal');
+      const titleEl = container.querySelector('#lg-cal-title');
+      if (!calEl) return;
+      titleEl.textContent = calY + '年' + (calM + 1) + '月';
+      const ym = calY + '-' + pad(calM + 1);
+      const startDow = (new Date(calY, calM, 1).getDay() + 6) % 7; // 周一为 0
+      const daysInMonth = new Date(calY, calM + 1, 0).getDate();
+      const dayMap = {};
+      state.records.forEach((r) => {
+        if (r.date.slice(0, 7) !== ym) return;
+        const d = parseInt(r.date.slice(8, 10), 10);
+        dayMap[d] = dayMap[d] || { exp: 0, inc: 0 };
+        if (r.type === 'inc') dayMap[d].inc += r.amount; else dayMap[d].exp += r.amount;
+      });
+      const wk = ['一', '二', '三', '四', '五', '六', '日'];
+      let cells = '<div class="lg-cal-grid lg-cal-headrow">' + wk.map((w) => '<span>' + w + '</span>').join('') + '</div>';
+      cells += '<div class="lg-cal-grid">';
+      for (let i = 0; i < startDow; i++) cells += '<span class="lg-cal-cell empty"></span>';
+      for (let d = 1; d <= daysInMonth; d++) {
+        const ds = calY + '-' + pad(calM + 1) + '-' + pad(d);
+        const m = dayMap[d];
+        let mark = '';
+        if (m) {
+          const net = m.inc - m.exp;
+          const shown = (net >= 0 ? '+' : '−') + money(Math.abs(net)).replace('¥', '');
+          mark = '<span class="lg-cal-net ' + (net >= 0 ? 'inc' : 'exp') + '">' + shown + '</span>';
+        }
+        const sel = ds === selDay ? ' sel' : '';
+        const today = ds === todayStr() ? ' today' : '';
+        cells += '<button class="lg-cal-cell' + (m ? ' has' : '') + sel + today + '" type="button" data-day="' + ds + '">' +
+          '<span class="lg-cal-d">' + d + '</span>' + mark + '</button>';
+      }
+      cells += '</div>';
+      calEl.innerHTML = cells;
+      paintCalDetail();
+    }
+
+    function paintCalDetail() {
+      const el = container.querySelector('#lg-cal-detail');
+      if (!el) return;
+      const list = state.records.filter((r) => r.date === selDay)
+        .sort((a, b) => b.id.localeCompare(a.id));
+      if (!list.length) {
+        el.innerHTML = '<p class="muted" style="margin:8px 0 0">这一天还没有记账。</p>';
+        return;
+      }
+      let exp = 0, inc = 0;
+      list.forEach((r) => { if (r.type === 'inc') inc += r.amount; else exp += r.amount; });
+      const rows = list.map((r) => {
+        const cat = CATS.find((c) => c.n === r.cat) || { e: r.cat ? '🏷️' : '❓', n: r.cat || '待分类' };
+        const acc = ACCOUNTS.find((a) => a.k === r.account) || { e: '💵', n: '现金' };
+        const sign = r.type === 'inc' ? '+' : '−';
+        const note = r.note ? ' · ' + App.escapeHtml(r.note) : '';
+        return '<div class="lg-cal-item ' + (r.type === 'inc' ? 'inc' : 'exp') + '">' +
+          '<span class="lg-cal-item-e">' + cat.e + '</span>' +
+          '<span class="lg-cal-item-meta"><span class="lg-cal-item-cat">' + App.escapeHtml(cat.n) + '</span>' +
+          '<span class="lg-cal-item-acc">' + acc.e + acc.n + note + '</span></span>' +
+          '<span class="lg-cal-item-amt">' + sign + money(r.amount) + '</span>' +
+          '</div>';
+      }).join('');
+      el.innerHTML = '<div class="lg-cal-detail-head">' + selDay +
+        ' · 收 ' + money(inc) + ' / 支 ' + money(exp) + ' / 净 ' + money(inc - exp) + '</div>' + rows;
+    }
+
+    container.querySelector('#lg-cal-prev').addEventListener('click', () => {
+      calM--; if (calM < 0) { calM = 11; calY--; }
+      paintCalendar();
+    });
+    container.querySelector('#lg-cal-next').addEventListener('click', () => {
+      calM++; if (calM > 11) { calM = 0; calY++; }
+      paintCalendar();
+    });
+    container.querySelector('#lg-cal').addEventListener('click', (e) => {
+      const c = e.target.closest('[data-day]');
+      if (!c) return;
+      selDay = c.dataset.day;
+      paintCalendar();
+    });
+
     // ---------- 首次渲染 ----------
     paintBalance();
     paintCats();
     paintAccts();
     paintRecords();
     paintSummary();
+    paintCalendar();
     updateHint();
   }
 });
