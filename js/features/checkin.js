@@ -204,11 +204,13 @@ App.registerFeature({
       '  <div class="ci-modal" id="ci-makeup-modal" hidden>' +
       '    <div class="ci-modal-box">' +
       '      <h3>补签</h3>' +
-      '      <p class="muted ci-edit-sub">为过去的某一天补打卡（按当时份数全部完成）。</p>' +
+      '      <p class="muted ci-edit-sub">为过去的某一天补打卡：勾选当天实际完成的任务（可只补其中一项）。</p>' +
       '      <div class="ci-field"><span>选择日期</span>' +
       '        <input id="ci-makeup-date" type="date" />' +
       '      </div>' +
-      '      <p class="muted ci-makeup-hint" id="ci-makeup-hint"></p>' +
+      '      <div class="ci-field"><span>完成的任务（可多选）</span>' +
+      '        <div class="ci-makeup-parts" id="ci-makeup-parts"></div>' +
+      '      </div>' +
       '      <div class="ci-modal-actions">' +
       '        <button class="btn ghost" id="ci-makeup-cancel" type="button">取消</button>' +
       '        <button class="btn" id="ci-makeup-save" type="button">确认补签</button>' +
@@ -997,14 +999,37 @@ App.registerFeature({
       })();
       dateInput.min = min;
       dateInput.max = today;
-      // 上限取 min(创建时间, 今天)
-      const hint = makeupModal.querySelector('#ci-makeup-hint');
-      hint.textContent = '将把所选日期的 ' + h.parts + ' 份全部标记为完成（仅过去日期可补签）。';
+      renderMakeupParts();
       makeupModal.hidden = false;
+    }
+    // 补签：渲染所选日期各份任务的勾选态（默认沿用该日已有记录）
+    function renderMakeupParts() {
+      const h = habits.find((x) => x.id === makeupTargetId);
+      if (!h) return;
+      const ds = makeupModal.querySelector('#ci-makeup-date').value;
+      const rec = records[h.id] || {};
+      const e = rec[ds];
+      const existing = (e && e.parts) ? e.parts : new Array(h.parts).fill(false);
+      const labels = (h.labels && h.labels.length === h.parts)
+        ? h.labels : existing.map((_, i) => '第' + (i + 1) + '份');
+      const wrap = makeupModal.querySelector('#ci-makeup-parts');
+      if (!wrap) return;
+      wrap.innerHTML = labels.map((lab, i) =>
+        '<button type="button" class="ci-makeup-part' + (existing[i] ? ' on' : '') +
+        '" data-i="' + i + '">' + App.escapeHtml(lab || ('第' + (i + 1) + '份')) + '</button>'
+      ).join('');
     }
     function closeMakeupModal() { makeupModal.hidden = true; makeupTargetId = null; }
     makeupModal.querySelector('#ci-makeup-cancel').addEventListener('click', closeMakeupModal);
     makeupModal.addEventListener('click', (e) => { if (e.target === makeupModal) closeMakeupModal(); });
+    // 任务勾选（弹层内 wrap 不变，仅子元素重渲，事件委托挂 wrap 上即可）
+    makeupModal.querySelector('#ci-makeup-parts').addEventListener('click', (e) => {
+      const b = e.target.closest('.ci-makeup-part');
+      if (!b) return;
+      b.classList.toggle('on');
+    });
+    // 改日期时同步刷新勾选态（沿用该日已有记录）
+    makeupModal.querySelector('#ci-makeup-date').addEventListener('change', renderMakeupParts);
     makeupModal.querySelector('#ci-makeup-save').addEventListener('click', () => {
       const h = habits.find((x) => x.id === makeupTargetId);
       if (!h) { closeMakeupModal(); return; }
@@ -1014,11 +1039,13 @@ App.registerFeature({
       if (ds > t) { App.toast('只能为过去日期补签'); return; }
       const rec = records[h.id] || (records[h.id] = {});
       const arr = new Array(h.parts).fill(false);
-      for (let i = 0; i < h.parts; i++) arr[i] = true;   // 全部完成
-      rec[ds] = { parts: arr, done: true };
+      makeupModal.querySelectorAll('#ci-makeup-parts .ci-makeup-part.on').forEach((b) => { arr[+b.dataset.i] = true; });
+      const done = arr.every(Boolean);
+      rec[ds] = { parts: arr, done: done };
       saveRecords();
       closeMakeupModal();
-      App.toast('已为 ' + ds + ' 补签「' + h.name + '」');
+      const cnt = arr.filter(Boolean).length;
+      App.toast('已为 ' + ds + ' 补签「' + h.name + '」（' + cnt + '/' + h.parts + (cnt === h.parts ? '，全部完成' : '，部分完成') + '）');
       // 刷新：日历该日加深 + 切到该日展示
       selDate = ds;
       paintCalendar();

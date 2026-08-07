@@ -18,15 +18,36 @@ App.registerFeature({
     function load() {
       try {
         const o = JSON.parse(localStorage.getItem(KEY));
-        if (o && typeof o === 'object') return o;
+        if (o && typeof o === 'object') {
+          if (!o.accounts || typeof o.accounts !== 'object') {
+            o.accounts = {
+              bank: { name: '银行卡', init: 0 },
+              wechat: { name: '微信', init: 0 },
+              alipay: { name: '支付宝', init: 0 },
+              cash: { name: '现金', init: 0 },
+            };
+            if (typeof o.init === 'number') o.accounts.cash.init = o.init; // 旧单一存款并入现金
+          }
+          if (!Array.isArray(o.records)) o.records = [];
+          // 旧记录补齐 account 字段（归入现金）
+          o.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
+          return o;
+        }
       } catch (e) {}
-      return { init: 0, records: [] };
+      return {
+        accounts: {
+          bank: { name: '银行卡', init: 0 },
+          wechat: { name: '微信', init: 0 },
+          alipay: { name: '支付宝', init: 0 },
+          cash: { name: '现金', init: 0 },
+        },
+        records: [],
+      };
     }
     function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
 
     let state = load();
     if (!Array.isArray(state.records)) state.records = [];
-    if (typeof state.init !== 'number') state.init = 0;
 
     // ---------- 工具 ----------
     const pad = (n) => (n < 10 ? '0' + n : '' + n);
@@ -51,16 +72,31 @@ App.registerFeature({
       { e: '📈', n: '理财', type: 'inc' }, { e: '➕', n: '其他收入', type: 'inc' },
     ];
 
-    // 记账时选中的分类（可空）；正在补标签的记录 id（可空）
+    // 账户：初始存款拆分为四个来源；记账时选择这笔钱来自 / 存入哪个账户
+    const ACCOUNTS = [
+      { k: 'bank', e: '🏦', n: '银行卡' },
+      { k: 'wechat', e: '💚', n: '微信' },
+      { k: 'alipay', e: '🔷', n: '支付宝' },
+      { k: 'cash', e: '💵', n: '现金' },
+    ];
+
+    // 记账时选中的分类（可空）；正在补标签的记录 id（可空）；选中的账户
     let pendingType = null;
     let editingId = null;
+    let pendingAccount = 'bank';
     // 各类型支出明细当前选中的周期：day / week / month
     let typePeriod = 'month';
 
-    // 余额
+    // 余额：各账户余额之和
+    function accountBalance(k) {
+      const a = state.accounts[k];
+      let b = a ? a.init : 0;
+      state.records.forEach((r) => { if (r.account === k) b += (r.type === 'inc' ? r.amount : -r.amount); });
+      return b;
+    }
     function balance() {
-      let b = state.init;
-      state.records.forEach((r) => { b += (r.type === 'inc' ? r.amount : -r.amount); });
+      let b = 0;
+      Object.keys(state.accounts).forEach((k) => { b += accountBalance(k); });
       return b;
     }
 
@@ -87,11 +123,14 @@ App.registerFeature({
       '          <button class="btn" id="lg-ok" type="button">记一笔</button>' +
       '        </div>' +
       '      </div>' +
+      '      <div class="lg-accounts" id="lg-accounts"></div>' +
       '      <input id="lg-note" class="lg-enter-note" type="text" maxlength="20" placeholder="备注（可选）" />' +
       '      <div class="lg-enter-hint" id="lg-enter-hint"></div>' +
       '      <div class="lg-cats-title">选择类型（可选）</div>' +
       '      <div class="lg-cats" id="lg-cats"></div>' +
-      '      <div class="lg-rec-title">记录（点一条可补类型）</div>' +
+      '      <div class="lg-accts-title">账户（这笔钱来自 / 存入）</div>' +
+      '      <div class="lg-accts" id="lg-accts"></div>' +
+      '      <div class="lg-rec-title">记录（点一条可补类型 / 账户）</div>' +
       '      <div class="lg-rec" id="lg-rec"></div>' +
       '    </div>' +
       '    <div class="lg-page" data-page="summary">' +
@@ -102,6 +141,17 @@ App.registerFeature({
       '  <div class="lg-pager" id="lg-pager">' +
       '    <span class="lg-pager-dot on" data-go="main"></span>' +
       '    <span class="lg-pager-dot" data-go="summary"></span>' +
+      '  </div>' +
+      '  <div class="ci-modal" id="lg-acct-set" hidden>' +
+      '    <div class="ci-modal-box">' +
+      '      <h3>设置各账户初始余额</h3>' +
+      '      <p class="muted ci-edit-sub">分别填写每个账户里现有的钱，作为余额起点。</p>' +
+      '      <div id="lg-acct-set-rows"></div>' +
+      '      <div class="ci-modal-actions">' +
+      '        <button class="btn ghost" id="lg-acct-set-cancel" type="button">取消</button>' +
+      '        <button class="btn" id="lg-acct-set-save" type="button">保存</button>' +
+      '      </div>' +
+      '    </div>' +
       '  </div>' +
       '</div>';
 
@@ -121,6 +171,9 @@ App.registerFeature({
     const balSubEl = container.querySelector('#lg-bal-sub');
     const catsEl = container.querySelector('#lg-cats');
     const recEl = container.querySelector('#lg-rec');
+    const accountsEl = container.querySelector('#lg-accounts');
+    const acctsEl = container.querySelector('#lg-accts');
+    const acctSetModal = container.querySelector('#lg-acct-set');
     const amountInput = container.querySelector('#lg-amount');
     const noteInput = container.querySelector('#lg-note');
     const okBtn = container.querySelector('#lg-ok');
@@ -137,6 +190,15 @@ App.registerFeature({
         if (r.type === 'inc') inc += r.amount; else exp += r.amount;
       });
       balSubEl.textContent = '本月收入 ' + money(inc) + ' · 支出 ' + money(exp);
+      // 各账户余额（始终可见，不点余额也能看到）
+      accountsEl.innerHTML = ACCOUNTS.map((a) => {
+        const b = accountBalance(a.k);
+        return '<div class="lg-acct-bal">' +
+          '<span class="lg-acct-e">' + a.e + '</span>' +
+          '<span class="lg-acct-meta"><span class="lg-acct-n">' + a.n + '</span>' +
+          '<span class="lg-acct-amt' + (b < 0 ? ' neg' : '') + '">' + money(b) + '</span></span>' +
+          '</div>';
+      }).join('');
     }
 
     // ---------- 消费总结（周/月/平均） ----------
@@ -301,11 +363,21 @@ App.registerFeature({
       ).join('');
       updateSign();
     }
+    function paintAccts() {
+      acctsEl.innerHTML = ACCOUNTS.map((a) =>
+        '<button class="lg-acct' + (pendingAccount === a.k ? ' on' : '') + '" type="button" ' +
+        'data-k="' + a.k + '">' +
+        '<span class="lg-acct-e">' + a.e + '</span><span class="lg-acct-n">' + a.n + '</span>' +
+        '</button>'
+      ).join('');
+    }
     function updateHint() {
       if (!enterHint) return;
+      const acc = ACCOUNTS.find((a) => a.k === pendingAccount);
+      const accName = acc ? acc.n : '';
       enterHint.textContent = pendingType
-        ? ('已选「' + pendingType.n + '」，输入金额后点记一笔。')
-        : '直接输入金额即可记账（待分类）；也可先点上方类型。';
+        ? ('已选「' + pendingType.n + '」，金额将' + (pendingType.type === 'inc' ? '存入' : '从') + '「' + accName + '」。')
+        : ('直接输入金额即可记账（待分类 · 计入「' + accName + '」）；也可先点上方类型。');
     }
 
     // ---------- 记录列表（可展开补类型） ----------
@@ -317,6 +389,7 @@ App.registerFeature({
       }
       recEl.innerHTML = list.map((r) => {
         const cat = CATS.find((c) => c.n === r.cat) || { e: r.cat ? '🏷️' : '❓', n: r.cat || '待分类' };
+        const acc = ACCOUNTS.find((a) => a.k === r.account) || { e: '💵', n: '现金' };
         const sign = r.type === 'inc' ? '+' : '-';
         const cls = r.type === 'inc' ? ' inc' : ' exp';
         const noCat = !r.cat;
@@ -324,7 +397,7 @@ App.registerFeature({
         let html = '<div class="lg-rec-item' + cls + (noCat ? ' no-cat' : '') + '" data-id="' + r.id + '">' +
           '  <span class="lg-rec-e">' + cat.e + '</span>' +
           '  <span class="lg-rec-meta"><span class="lg-rec-cat">' + App.escapeHtml(cat.n) + '</span>' +
-          '    <span class="lg-rec-date">' + r.date + note + '</span></span>' +
+          '    <span class="lg-rec-date">' + r.date + ' · ' + acc.e + acc.n + note + '</span></span>' +
           '  <span class="lg-rec-amt">' + sign + money(r.amount) + '</span>' +
           '  <button class="lg-rec-del" type="button" data-del="' + r.id + '" aria-label="删除">✕</button>' +
           '</div>';
@@ -332,6 +405,10 @@ App.registerFeature({
           html += '<div class="lg-rec-cats" data-id="' + r.id + '">' +
             CATS.map((c) => '<button class="lg-rec-cat' + (c.type === 'inc' ? ' inc' : '') +
               '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
+            '</div>';
+          html += '<div class="lg-rec-accts" data-id="' + r.id + '">' +
+            ACCOUNTS.map((a) => '<button class="lg-rec-acct' + (r.account === a.k ? ' on' : '') +
+              '" type="button" data-acct="' + a.k + '">' + a.e + ' ' + a.n + '</button>').join('') +
             '</div>';
         }
         return html;
@@ -348,6 +425,7 @@ App.registerFeature({
         date: todayStr(),
         cat: cat ? cat.n : '',
         type: cat ? cat.type : 'exp',
+        account: pendingAccount,
         amount: Math.round(amt * 100) / 100,
         note: noteInput.value.trim(),
       });
@@ -374,6 +452,14 @@ App.registerFeature({
       if (!c) return;
       pendingType = (pendingType && pendingType.n === c.n) ? null : c;
       paintCats();
+      updateHint();
+    });
+    // 账户选择
+    acctsEl.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-k]');
+      if (!b) return;
+      pendingAccount = b.dataset.k;
+      paintAccts();
       updateHint();
     });
 
@@ -410,6 +496,18 @@ App.registerFeature({
         editingId = null;
         return;
       }
+      const acctBtn = e.target.closest('.lg-rec-acct');
+      if (acctBtn) {
+        const id = acctBtn.closest('.lg-rec-accts').dataset.id;
+        const r = state.records.find((x) => x.id === id);
+        const k = acctBtn.dataset.acct;
+        if (r && k) {
+          r.account = k; save();
+          paintBalance(); paintRecords(); paintSummary();
+          App.toast('已改账户为 ' + ((ACCOUNTS.find((a) => a.k === k) || {}).n || k));
+        }
+        return;
+      }
       const item = e.target.closest('.lg-rec-item');
       if (item) {
         const id = item.dataset.id;
@@ -419,19 +517,35 @@ App.registerFeature({
     });
 
     // ---------- 设置存款（初始余额） ----------
-    container.querySelector('#lg-set').addEventListener('click', () => {
-      App.prompt('设置初始存款', state.init, (n) => {
-        if (n == null || isNaN(n)) { App.toast('请输入数字'); return; }
-        state.init = Math.round(n * 100) / 100;
-        save();
-        paintBalance();
-        App.toast('已设置存款为 ' + money(state.init));
-      }, { type: 'number', hint: '设置后会作为余额起点，加上后面所有收入减去支出 = 当前存款。' });
+    container.querySelector('#lg-set').addEventListener('click', openAcctSet);
+    function openAcctSet() {
+      const rows = acctSetModal.querySelector('#lg-acct-set-rows');
+      rows.innerHTML = ACCOUNTS.map((a) =>
+        '<div class="ci-field"><span>' + a.e + ' ' + a.n + '</span>' +
+        '<input type="number" inputmode="decimal" step="0.01" min="0" data-k="' + a.k + '" value="' + (state.accounts[a.k].init || 0) + '" /></div>'
+      ).join('');
+      acctSetModal.hidden = false;
+    }
+    function closeAcctSet() { acctSetModal.hidden = true; }
+    acctSetModal.querySelector('#lg-acct-set-cancel').addEventListener('click', closeAcctSet);
+    acctSetModal.addEventListener('click', (e) => { if (e.target === acctSetModal) closeAcctSet(); });
+    acctSetModal.querySelector('#lg-acct-set-save').addEventListener('click', () => {
+      acctSetModal.querySelectorAll('#lg-acct-set-rows input').forEach((inp) => {
+        const k = inp.dataset.k;
+        const v = parseFloat(inp.value);
+        state.accounts[k].init = (isNaN(v) ? 0 : Math.round(v * 100) / 100);
+      });
+      save();
+      closeAcctSet();
+      paintBalance();
+      paintSummary();
+      App.toast('已设置各账户初始余额');
     });
 
     // ---------- 首次渲染 ----------
     paintBalance();
     paintCats();
+    paintAccts();
     paintRecords();
     paintSummary();
     updateHint();
