@@ -831,6 +831,8 @@
             '<span class="lg-cal-item-meta"><span class="lg-cal-item-cat">' + App.escapeHtml(cat.n) + '</span>' +
             '<span class="lg-cal-item-acc">' + acc.e + acc.n + note + '</span></span>' +
             '<span class="lg-cal-item-amt">' + sign + money(r.amount) + '</span>' +
+            (calEditId === r.id ? '' :
+              '<button class="lg-cal-del" type="button" data-cal-del="' + r.id + '" aria-label="删除">✕</button>') +
             '</div>';
           if (calEditId === r.id) {
             html += '<div class="lg-rec-edit" data-id="' + r.id + '">' +
@@ -952,6 +954,20 @@
             try { save(); } catch (e) {}
             paintBalance(); paintSummary();
           }
+          return;
+        }
+        const delBtn = e.target.closest('[data-cal-del]');
+        if (delBtn) {
+          const id = delBtn.dataset.calDel;
+          const r = state.records.find((x) => x.id === id);
+          if (!r) return;
+          App.confirm('删除记录', '确认删除这笔「' + (r.cat || '待分类') + ' ' + money(r.amount) + '」？', () => {
+            state.records = state.records.filter((x) => x.id !== id);
+            save();
+            calEditId = null;
+            paintBalance(); paintRecords(); paintSummary(); paintCalendar(); paintCalDetail();
+            App.toast('已删除');
+          });
           return;
         }
         const item = e.target.closest('.lg-cal-item');
