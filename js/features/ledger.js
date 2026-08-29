@@ -972,63 +972,80 @@
         if (!G) return '<p class="muted">同步模块未加载。</p>';
         if (G.isConnected()) {
           return '<p style="margin:0 0 10px">已连接 GitHub，数据会自动同步到仓库 <code>data/ledger.json</code>。</p>' +
-            '<button class="btn ghost" type="button" id="lg-gh-logout">断开连接</button>';
+            '<button class="btn ghost" type="button" id="lg-gh-logout">断开连接</button>' +
+            '<button class="btn" type="button" id="lg-gh-pull" style="margin-left:8px">立即拉取</button>';
         }
-        return '<p class="muted" style="margin:0 0 10px">点「开始连接」后，会显示一个验证码，' +
-          '去 github.com/login/device 输入即可（无需密码/密钥）。</p>' +
-          '<button class="btn" type="button" id="lg-gh-start">开始连接</button>';
+        return '<p class="muted" style="margin:0 0 8px">把数据存到 GitHub 仓库（多端共享同一份，免导出导入）。' +
+          '请输入具有 <code>public_repo</code> 权限的 Personal Access Token：</p>' +
+          '<div class="ci-field"><span>Token</span>' +
+          '<input type="password" id="lg-gh-token" placeholder="ghp_xxx 或 github_pat_xxx" autocomplete="off" style="flex:1"></div>' +
+          '<p class="muted" style="font-size:12px;margin:6px 0 10px">创建：GitHub → Settings → Developer settings → ' +
+          'Personal access tokens → 勾选 <code>public_repo</code>。Token 仅存本机浏览器，不上传。</p>' +
+          '<button class="btn" type="button" id="lg-gh-connect">连接</button>';
       }
       function bindGhButtons() {
-        const startBtn = ghBody.querySelector('#lg-gh-start');
-        if (startBtn) startBtn.addEventListener('click', doLogin);
+        const connBtn = ghBody.querySelector('#lg-gh-connect');
+        if (connBtn) connBtn.addEventListener('click', doConnect);
         const lo = ghBody.querySelector('#lg-gh-logout');
         if (lo) lo.addEventListener('click', () => { G.logout(); paintGhModal(); App.toast('已断开连接'); });
+        const pull = ghBody.querySelector('#lg-gh-pull');
+        if (pull) pull.addEventListener('click', doPull);
       }
       function paintGhModal() { ghBody.innerHTML = ghStatusHtml(); bindGhButtons(); }
 
-      async function doLogin() {
+      async function doConnect() {
         if (!G) return;
-        ghBody.innerHTML = '<p>正在获取设备码…</p>';
-        let flow;
+        const input = ghBody.querySelector('#lg-gh-token');
+        const pat = input ? input.value : '';
+        ghBody.innerHTML = '<p>正在校验 Token…</p>';
         try {
-          flow = await G.startDeviceFlow();
+          await G.connect(pat);
         } catch (e) {
-          ghBody.innerHTML = '<p style="color:#c0392b">发起失败：' + (e.message || e) + '</p>' +
-            '<button class="btn" type="button" id="lg-gh-start">重试</button>';
-          bindGhButtons();
+          ghBody.innerHTML = '<p style="color:#c0392b">连接失败：' + (e.message || e) + '</p>' +
+            '<button class="btn" type="button" id="lg-gh-retry">重试</button>';
+          const rb = ghBody.querySelector('#lg-gh-retry');
+          if (rb) rb.addEventListener('click', paintGhModal);
           return;
         }
-        ghBody.innerHTML =
-          '<p>请在浏览器打开：<a href="' + flow.verification_uri + '" target="_blank" rel="noopener">' + flow.verification_uri + '</a></p>' +
-          '<p>输入验证码：<b style="font-size:20px;letter-spacing:2px">' + flow.user_code + '</b></p>' +
-          '<p class="muted" id="lg-gh-wait">等待授权…</p>';
         try {
-          await G.pollToken(flow.device_code, flow.interval, (s) => {
-            const w = ghBody.querySelector('#lg-gh-wait');
-            if (w) w.textContent = (s === 'slow_down' ? '请稍候（服务器要求放慢轮询）…' : '等待授权…');
-          });
-          try {
-            const { content } = await G.readFile();
-            if (content && typeof content === 'object') {
-              state = content;
-              if (!Array.isArray(state.records)) state.records = [];
-              if (!state.accounts) state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
-              if (!Array.isArray(state.cats)) state.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
-              if (typeof state.budget !== 'number') state.budget = 0;
-              state.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
-              paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
-            } else {
-              G.sync(state).catch(() => {}); // 仓库为空，上传本地
-            }
-          } catch (e) {
-            App.toast('拉取仓库数据失败：' + (e.message || e));
+          const { content } = await G.readFile();
+          if (content && typeof content === 'object') {
+            state = content;
+            if (!Array.isArray(state.records)) state.records = [];
+            if (!state.accounts) state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+            if (!Array.isArray(state.cats)) state.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
+            if (typeof state.budget !== 'number') state.budget = 0;
+            state.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
+            paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
+            App.toast('已从仓库拉取数据');
+          } else {
+            G.sync(state).catch(() => {}); // 仓库为空，上传本地
+            App.toast('已连接，本地数据已上传');
           }
-          paintGhModal();
-          App.toast('已连接 GitHub，数据已同步');
         } catch (e) {
-          ghBody.innerHTML = '<p style="color:#c0392b">授权失败：' + (e.message || e) + '</p>' +
-            '<button class="btn" type="button" id="lg-gh-start">重试</button>';
-          bindGhButtons();
+          App.toast('拉取仓库数据失败：' + (e.message || e));
+        }
+        paintGhModal();
+      }
+
+      async function doPull() {
+        if (!G) return;
+        try {
+          const { content } = await G.readFile();
+          if (content && typeof content === 'object') {
+            state = content;
+            if (!Array.isArray(state.records)) state.records = [];
+            if (!state.accounts) state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+            if (!Array.isArray(state.cats)) state.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
+            if (typeof state.budget !== 'number') state.budget = 0;
+            state.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
+            paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
+            App.toast('已拉取最新数据');
+          } else {
+            App.toast('仓库暂无数据');
+          }
+        } catch (e) {
+          App.toast('拉取失败：' + (e.message || e));
         }
       }
 

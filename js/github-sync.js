@@ -1,30 +1,29 @@
 /**
- * GitHub 同步层（设备流 / Device Flow）
+ * GitHub 同步层（Personal Access Token 方式）
  *
- * 纯前端实现，无需后端。适用于「单一数据源」场景：把应用数据存在仓库文件中，
- * 多端共用同一份数据，免导出导入。
+ * 纯前端实现，无需后端、无需代理。
+ * 说明：GitHub 的设备码端点（login/device/code）不返回 CORS 头，浏览器无法直连，
+ * 因此改用 Personal Access Token（PAT）登录——数据读写走 api.github.com（带 CORS 头，可直连）。
  *
  * 用法（任意页面）：
  *   if (window.GitHubSync && GitHubSync.isConnected()) { ... }
- *   await GitHubSync.startDeviceFlow()  // 返回 { user_code, verification_uri, interval, device_code }
- *   await GitHubSync.pollToken(deviceCode, interval)  // 轮询换取 token
- *   await GitHubSync.sync(data)  // 读取 sha 后写回 data/ledger.json（自动处理 409 冲突）
+ *   await GitHubSync.connect(pat)        // 校验并保存 token（localStorage）
+ *   await GitHubSync.readFile()          // 读取 data/ledger.json -> { content, sha }
+ *   await GitHubSync.sync(data)          // 读取 sha 后写回（自动处理 409 冲突）
+ *   GitHubSync.logout()
  */
 (function () {
   'use strict';
 
   const REPO = 'shvanten/my-mobile-app';
   const FILE_PATH = 'data/ledger.json';
-  const CLIENT_ID = 'Ov23liBVAAmOju76LU2U';
   const TOKEN_KEY = 'gh_ledger_token';
-  const SCOPE = 'public_repo';
 
   function sleep(ms) { return new Promise((res) => setTimeout(res, ms)); }
 
   const GitHubSync = {
     repo: REPO,
     file: FILE_PATH,
-    clientId: CLIENT_ID,
     token: (function () {
       try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
     })(),
@@ -36,50 +35,23 @@
       try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
     },
 
-    // 发起设备流，返回 { device_code, user_code, verification_uri, interval }
-    async startDeviceFlow() {
-      const r = await fetch('https://github.com/login/device/code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ client_id: CLIENT_ID, scope: SCOPE }),
+    // 校验并保存 PAT：用一次只读请求确认 token 有效、且对该仓库有 contents 权限
+    async connect(pat) {
+      pat = (pat || '').trim();
+      if (!pat) throw new Error('请输入有效的 Token');
+      const testUrl = 'https://api.github.com/repos/' + REPO + '/contents/' + encodeURIComponent(FILE_PATH).replace(/%2F/g, '/');
+      const r = await fetch(testUrl, {
+        headers: { 'Authorization': 'Bearer ' + pat, 'Accept': 'application/vnd.github+json' },
       });
-      if (!r.ok) throw new Error('发起设备码失败：HTTP ' + r.status);
-      const d = await r.json();
-      if (!d.device_code || !d.user_code) throw new Error('设备码响应异常');
-      return {
-        device_code: d.device_code,
-        user_code: d.user_code,
-        verification_uri: d.verification_uri || 'https://github.com/login/device',
-        interval: d.interval || 5,
-      };
-    },
-
-    // 轮询换取 token，直到用户授权或超时（默认 15 分钟）
-    async pollToken(deviceCode, interval, onTick) {
-      const deadline = Date.now() + 15 * 60 * 1000;
-      let iv = interval || 5;
-      while (Date.now() < deadline) {
-        await sleep(iv * 1000);
-        const r = await fetch('https://github.com/login/oauth/access_token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({
-            client_id: CLIENT_ID,
-            device_code: deviceCode,
-            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-          }),
-        });
-        const d = await r.json();
-        if (d.access_token) {
-          this.token = d.access_token;
-          try { localStorage.setItem(TOKEN_KEY, d.access_token); } catch (e) {}
-          return d.access_token;
-        }
-        if (d.error === 'authorization_pending') { if (onTick) onTick('pending'); continue; }
-        if (d.error === 'slow_down') { iv += 5; if (onTick) onTick('slow_down'); continue; }
-        if (d.error) throw new Error('授权失败：' + d.error);
+      if (r.status === 401) { this.token = ''; throw new Error('Token 无效或已过期'); }
+      if (r.status === 403) { this.token = ''; throw new Error('Token 无权限（需 public_repo 或 repo 范围）'); }
+      if (r.status !== 200 && r.status !== 404) {
+        this.token = '';
+        throw new Error('校验失败：HTTP ' + r.status);
       }
-      throw new Error('授权超时，请重试');
+      this.token = pat;
+      try { localStorage.setItem(TOKEN_KEY, pat); } catch (e) {}
+      return true;
     },
 
     // 读取目标文件，返回 { content, sha }；文件不存在返回 { content:null, sha:null }
@@ -88,6 +60,7 @@
         headers: { 'Authorization': 'Bearer ' + this.token, 'Accept': 'application/vnd.github+json' },
       });
       if (r.status === 404) return { content: null, sha: null };
+      if (r.status === 401) { this.token = ''; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} throw new Error('Token 已失效，请重新连接'); }
       if (!r.ok) throw new Error('读取失败：HTTP ' + r.status);
       const d = await r.json();
       let content = null;
