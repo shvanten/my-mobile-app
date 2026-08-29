@@ -2932,9 +2932,10 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
   padding: 6px 4px; border-bottom: 1px solid var(--border); margin-bottom: 6px;
 }
 .lg-cal-item {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   padding: 8px 4px; border-bottom: 1px solid var(--border);
 }
+.lg-cal-item .lg-rec-edit { flex: 1 1 100%; }
 .lg-cal-item-e { font-size: 18px; flex: 0 0 auto; }
 .lg-cal-item-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .lg-cal-item-cat { font-size: 14px; }

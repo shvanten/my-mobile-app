@@ -840,6 +840,7 @@
               cats().map((c) => '<button class="lg-rec-cat' + (c.type === 'inc' ? ' inc' : '') +
                 (r.cat === c.n ? ' on' : '') + '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
               '</div>' +
+              '<button class="btn ghost lg-rec-cat-add" type="button" data-open-cats="1">＋ 新建分类</button>' +
               '<div class="lg-edit-label">账户</div>' +
               '<div class="lg-rec-accts">' +
               ACCOUNTS.map((a) => '<button class="lg-rec-acct' + (r.account === a.k ? ' on' : '') +
@@ -918,6 +919,8 @@
           paintCalDetail();
           return;
         }
+        const openCatsBtn = e.target.closest('[data-open-cats]');
+        if (openCatsBtn) { openCatsManage(); return; }
         const catBtn = e.target.closest('.lg-rec-cat');
         if (catBtn) {
           const item = catBtn.closest('.lg-cal-item');
