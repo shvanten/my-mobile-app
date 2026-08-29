@@ -27,6 +27,7 @@
     color: '#c2a06a',
     render(container) {
       const KEY = 'ledger.v1';
+      const G = window.GitHubSync || null;
 
       // ---------- 默认值（用于首次/迁移） ----------
       // 账户：初始存款拆分为四个来源；记账时选择这笔钱来自 / 存入哪个账户
@@ -72,11 +73,19 @@
         return {
           accounts: JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS)),
           records: [],
-          cats: JSON.parse(JSON.parse(JSON.stringify(DEFAULT_CATS)).toString()),
+          cats: JSON.parse(JSON.stringify(DEFAULT_CATS)),
           budget: 0,
         };
       }
-      function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+      function save() {
+        localStorage.setItem(KEY, JSON.stringify(state));
+        // 已连接 GitHub 时，把数据写回仓库文件（异步、失败仅提示，不阻塞）
+        if (G && G.isConnected()) {
+          G.sync(state).catch((err) => {
+            App.toast('同步 GitHub 失败：' + (err && err.message ? err.message : '未知错误'));
+          });
+        }
+      }
 
       let state = load();
       if (!Array.isArray(state.records)) state.records = [];
@@ -141,6 +150,7 @@
         '  <div class="lg-head">' +
         '    <h2>记账</h2>' +
         '    <div class="lg-head-actions">' +
+        '      <button class="btn ghost" type="button" id="lg-gh">🔗 同步</button>' +
         '      <button class="btn ghost" type="button" id="lg-cats-manage">🏷️ 分类</button>' +
         '      <button class="btn ghost lg-set" type="button" id="lg-set">💰 设置</button>' +
         '    </div>' +
@@ -233,6 +243,15 @@
         '      </div>' +
         '      <div class="ci-modal-actions">' +
         '        <button class="btn" id="lg-cats-save" type="button">完成</button>' +
+        '      </div>' +
+        '    </div>' +
+        '  </div>' +
+        '  <div class="ci-modal" id="lg-gh-modal" hidden>' +
+        '    <div class="ci-modal-box">' +
+        '      <h3>GitHub 同步</h3>' +
+        '      <div id="lg-gh-body"></div>' +
+        '      <div class="ci-modal-actions">' +
+        '        <button class="btn" id="lg-gh-close" type="button">关闭</button>' +
         '      </div>' +
         '    </div>' +
         '  </div>' +
@@ -922,6 +941,78 @@
         }
       });
 
+      // ---------- GitHub 同步 ----------
+      const ghModal = container.querySelector('#lg-gh-modal');
+      const ghBody = container.querySelector('#lg-gh-body');
+      ghModal.querySelector('#lg-gh-close').addEventListener('click', () => { ghModal.hidden = true; });
+      ghModal.addEventListener('click', (e) => { if (e.target === ghModal) ghModal.hidden = true; });
+
+      function ghStatusHtml() {
+        if (!G) return '<p class="muted">同步模块未加载。</p>';
+        if (G.isConnected()) {
+          return '<p style="margin:0 0 10px">已连接 GitHub，数据会自动同步到仓库 <code>data/ledger.json</code>。</p>' +
+            '<button class="btn ghost" type="button" id="lg-gh-logout">断开连接</button>';
+        }
+        return '<p class="muted" style="margin:0 0 10px">点「开始连接」后，会显示一个验证码，' +
+          '去 github.com/login/device 输入即可（无需密码/密钥）。</p>' +
+          '<button class="btn" type="button" id="lg-gh-start">开始连接</button>';
+      }
+      function bindGhButtons() {
+        const startBtn = ghBody.querySelector('#lg-gh-start');
+        if (startBtn) startBtn.addEventListener('click', doLogin);
+        const lo = ghBody.querySelector('#lg-gh-logout');
+        if (lo) lo.addEventListener('click', () => { G.logout(); paintGhModal(); App.toast('已断开连接'); });
+      }
+      function paintGhModal() { ghBody.innerHTML = ghStatusHtml(); bindGhButtons(); }
+
+      async function doLogin() {
+        if (!G) return;
+        ghBody.innerHTML = '<p>正在获取设备码…</p>';
+        let flow;
+        try {
+          flow = await G.startDeviceFlow();
+        } catch (e) {
+          ghBody.innerHTML = '<p style="color:#c0392b">发起失败：' + (e.message || e) + '</p>' +
+            '<button class="btn" type="button" id="lg-gh-start">重试</button>';
+          bindGhButtons();
+          return;
+        }
+        ghBody.innerHTML =
+          '<p>请在浏览器打开：<a href="' + flow.verification_uri + '" target="_blank" rel="noopener">' + flow.verification_uri + '</a></p>' +
+          '<p>输入验证码：<b style="font-size:20px;letter-spacing:2px">' + flow.user_code + '</b></p>' +
+          '<p class="muted" id="lg-gh-wait">等待授权…</p>';
+        try {
+          await G.pollToken(flow.device_code, flow.interval, (s) => {
+            const w = ghBody.querySelector('#lg-gh-wait');
+            if (w) w.textContent = (s === 'slow_down' ? '请稍候（服务器要求放慢轮询）…' : '等待授权…');
+          });
+          try {
+            const { content } = await G.readFile();
+            if (content && typeof content === 'object') {
+              state = content;
+              if (!Array.isArray(state.records)) state.records = [];
+              if (!state.accounts) state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+              if (!Array.isArray(state.cats)) state.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
+              if (typeof state.budget !== 'number') state.budget = 0;
+              state.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
+              paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
+            } else {
+              G.sync(state).catch(() => {}); // 仓库为空，上传本地
+            }
+          } catch (e) {
+            App.toast('拉取仓库数据失败：' + (e.message || e));
+          }
+          paintGhModal();
+          App.toast('已连接 GitHub，数据已同步');
+        } catch (e) {
+          ghBody.innerHTML = '<p style="color:#c0392b">授权失败：' + (e.message || e) + '</p>' +
+            '<button class="btn" type="button" id="lg-gh-start">重试</button>';
+          bindGhButtons();
+        }
+      }
+
+      container.querySelector('#lg-gh').addEventListener('click', () => { paintGhModal(); ghModal.hidden = false; });
+
       // ---------- 首次渲染 ----------
       paintBalance();
       paintCats();
@@ -930,6 +1021,21 @@
       paintSummary();
       paintCalendar();
       updateHint();
+
+      // 已连接 GitHub 时，打开即拉取仓库最新数据（多端共享同一份）
+      if (G && G.isConnected()) {
+        G.readFile().then((res) => {
+          if (res && res.content && typeof res.content === 'object') {
+            state = res.content;
+            if (!Array.isArray(state.records)) state.records = [];
+            if (!state.accounts) state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+            if (!Array.isArray(state.cats)) state.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
+            if (typeof state.budget !== 'number') state.budget = 0;
+            state.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
+            paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
+          }
+        }).catch((e) => { /* 离线则用本地数据，不影响使用 */ });
+      }
     }
   });
 })();
