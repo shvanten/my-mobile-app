@@ -887,17 +887,19 @@
         }
         const saveBtn = e.target.closest('[data-cal-edit-save]');
         if (saveBtn) {
-          const item = saveBtn.closest('.lg-cal-item');
-          const r = state.records.find((x) => x.id === item.dataset.id);
+          const block = saveBtn.closest('.lg-rec-edit');
+          const r = state.records.find((x) => x.id === block.dataset.id);
           if (r) {
-            const block = saveBtn.closest('.lg-rec-edit');
             const amtVal = parseFloat(block.querySelector('.lg-cal-edit-amt').value);
             if (!amtVal || amtVal <= 0) { App.toast('请输入有效金额'); return; }
             const catBtn = block.querySelector('.lg-rec-cat.on');
             const acctBtn = block.querySelector('.lg-rec-acct.on');
             const cat = catBtn ? cats().find((c) => c.n === catBtn.dataset.cat) : null;
             r.amount = Math.round(amtVal * 100) / 100;
-            if (cat) { r.cat = cat.n; r.type = cat.type; }
+            if (catBtn) {
+              r.cat = catBtn.dataset.cat;
+              r.type = cat ? cat.type : (catBtn.classList.contains('inc') ? 'inc' : 'exp');
+            }
             if (acctBtn) r.account = acctBtn.dataset.acct;
             save();
             calEditId = null;
@@ -908,8 +910,8 @@
         }
         const cancelBtn = e.target.closest('[data-cal-edit-cancel]');
         if (cancelBtn) {
-          const item = cancelBtn.closest('.lg-cal-item');
-          const r = state.records.find((x) => x.id === item.dataset.id);
+          const block = cancelBtn.closest('.lg-rec-edit');
+          const r = state.records.find((x) => x.id === block.dataset.id);
           // 新增但未保存（金额为 0 且无分类）的空记录，取消即删除
           if (r && r.amount === 0 && !r.cat) {
             state.records = state.records.filter((x) => x.id !== r.id);
@@ -923,17 +925,33 @@
         if (openCatsBtn) { openCatsManage(); return; }
         const catBtn = e.target.closest('.lg-rec-cat');
         if (catBtn) {
-          const item = catBtn.closest('.lg-cal-item');
-          const r = state.records.find((x) => x.id === item.dataset.id);
-          const c = cats().find((x) => x.n === catBtn.dataset.cat);
-          if (r && c) { r.cat = c.n; r.type = c.type; save(); paintBalance(); paintSummary(); paintCalendar(); }
+          const edit = catBtn.closest('.lg-rec-edit');
+          if (edit) edit.querySelectorAll('.lg-rec-cat').forEach((b) => b.classList.remove('on'));
+          catBtn.classList.add('on');
+          const block = catBtn.closest('.lg-rec-edit');
+          const r = state.records.find((x) => x.id === block.dataset.id);
+          if (r) {
+            const name = catBtn.dataset.cat;
+            const c = cats().find((x) => x.n === name);
+            r.cat = name;
+            r.type = c ? c.type : (catBtn.classList.contains('inc') ? 'inc' : 'exp');
+            try { save(); } catch (e) {}
+            paintBalance(); paintSummary();
+          }
           return;
         }
         const acctBtn = e.target.closest('.lg-rec-acct');
         if (acctBtn) {
-          const item = acctBtn.closest('.lg-cal-item');
-          const r = state.records.find((x) => x.id === item.dataset.id);
-          if (r) { r.account = acctBtn.dataset.acct; save(); paintBalance(); paintSummary(); paintCalendar(); }
+          const edit = acctBtn.closest('.lg-rec-edit');
+          if (edit) edit.querySelectorAll('.lg-rec-acct').forEach((b) => b.classList.remove('on'));
+          acctBtn.classList.add('on');
+          const block = acctBtn.closest('.lg-rec-edit');
+          const r = state.records.find((x) => x.id === block.dataset.id);
+          if (r) {
+            r.account = acctBtn.dataset.acct;
+            try { save(); } catch (e) {}
+            paintBalance(); paintSummary();
+          }
           return;
         }
         const item = e.target.closest('.lg-cal-item');
