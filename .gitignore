@@ -1,0 +1,10 @@
+# WorkBuddy 项目数据（含本地状态，勿上传到公开仓库）
+.workbuddy/
+
+# 部署/压缩包
+*.zip
+my-mobile-app-deploy.zip
+
+# 系统/编辑器
+.DS_Store
+Thumbs.db
