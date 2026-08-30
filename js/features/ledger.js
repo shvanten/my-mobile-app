@@ -27,7 +27,6 @@
     color: '#c2a06a',
     render(container) {
       const KEY = 'ledger.v1';
-      const G = window.GitHubSync || null;
 
       // ---------- 默认值（用于首次/迁移） ----------
       // 账户：初始存款拆分为四个来源；记账时选择这笔钱来自 / 存入哪个账户
@@ -77,16 +76,10 @@
           budget: 0,
         };
       }
+      // 纯本地存储：每次改动直接写入浏览器 localStorage，无需联网、无需导出导入
       function save() {
-        // 仅写入本机会话缓存（隐私浏览下关闭即清空）；改动统一在「保存到 GitHub」按钮时推回仓库
         try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
-        markDirty();
       }
-
-      // ---------- GitHub 自动拉取 / 手动保存 ----------
-      let dirty = false;     // 是否有未保存到 GitHub 的改动
-      let loaded = false;    // 是否已从 GitHub 加载过（或确认离线）
-      let afterConnectPush = false; // 连接成功后是否立即推回
 
       function normalizeState(o) {
         o = (o && typeof o === 'object') ? o : {};
@@ -99,66 +92,6 @@
       }
       function repaintAll() {
         paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
-      }
-      function refreshSyncStatus() {
-        const el = container.querySelector('#lg-sync-status');
-        if (!el) return;
-        if (!G) { el.textContent = '（未启用 GitHub 同步）'; el.className = 'lg-sync-status'; return; }
-        if (!loaded) { el.textContent = '正在从 GitHub 加载最新数据…'; el.className = 'lg-sync-status loading'; return; }
-        if (dirty) { el.textContent = '● 有改动未保存，点右侧按钮存到 GitHub'; el.className = 'lg-sync-status dirty'; }
-        else { el.textContent = G.isConnected() ? '✓ 已与 GitHub 同步' : '（未连接，改动仅存本机）'; el.className = 'lg-sync-status clean'; }
-      }
-      function markDirty() { dirty = true; loaded = true; refreshSyncStatus(); }
-      function markClean() { dirty = false; loaded = true; refreshSyncStatus(); }
-
-      // 打开页面即自动拉取 GitHub 上的最新数据（公开仓库无需 Token 也可读）
-      async function initLoad() {
-        if (!G) { markClean(); return; }
-        refreshSyncStatus();
-        try {
-          const res = await G.readFile();
-          if (res && res.content && typeof res.content === 'object') {
-            state = normalizeState(res.content);
-            try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
-            markClean();
-            repaintAll();
-            App.toast('已从 GitHub 加载最新数据');
-          } else {
-            markClean();
-            repaintAll();
-          }
-        } catch (e) {
-          markClean();
-          App.toast('未能从 GitHub 拉取（' + (e && e.message ? e.message : '离线') + '），使用本机缓存');
-        }
-      }
-
-      // 手动保存：把改动推回 GitHub；未连接时引导先输入 Token
-      async function pushToGitHub() {
-        if (!G) { App.toast('同步模块未加载'); return; }
-        if (!G.isConnected()) {
-          afterConnectPush = true;
-          paintGhModal();
-          ghModal.hidden = false;
-          App.toast('请先输入 Token 连接 GitHub，再保存');
-          return;
-        }
-        const el = container.querySelector('#lg-sync-status');
-        if (el) { el.textContent = '正在保存到 GitHub…'; el.className = 'lg-sync-status loading'; }
-        try {
-          await G.sync(state);
-          markClean();
-          App.toast('已保存到 GitHub ✓');
-        } catch (e) {
-          if (e && e.status === 409) {
-            try { const { sha } = await G.readFile(); await G.writeFile(state, sha); markClean(); App.toast('已保存（已合并仓库最新版本）'); return; }
-            catch (e2) { /* fallthrough */ }
-          }
-          const msg = (e && e.message) ? e.message : '未知错误';
-          const st = container.querySelector('#lg-sync-status');
-          if (st) { st.textContent = '● 保存失败：' + msg; st.className = 'lg-sync-status dirty'; }
-          App.toast('保存到 GitHub 失败：' + msg);
-        }
       }
 
       let state = load();
@@ -235,14 +168,9 @@
         '  <div class="lg-head">' +
         '    <h2>记账</h2>' +
         '    <div class="lg-head-actions">' +
-        '      <button class="btn ghost" type="button" id="lg-gh">🔗 GitHub</button>' +
         '      <button class="btn ghost" type="button" id="lg-cats-manage">🏷️ 分类</button>' +
         '      <button class="btn ghost lg-set" type="button" id="lg-set">💰 设置</button>' +
         '    </div>' +
-        '  </div>' +
-        '  <div class="lg-sync-bar" id="lg-sync-bar">' +
-        '    <span class="lg-sync-status" id="lg-sync-status">正在从 GitHub 加载…</span>' +
-        '    <button class="btn" type="button" id="lg-save-gh">💾 保存到 GitHub</button>' +
         '  </div>' +
         '  <div class="lg-pages" id="lg-pages">' +
         '    <div class="lg-page" data-page="main">' +
@@ -348,15 +276,6 @@
         '      </div>' +
         '      <div class="ci-modal-actions">' +
         '        <button class="btn" id="lg-cats-save" type="button">完成</button>' +
-        '      </div>' +
-        '    </div>' +
-        '  </div>' +
-        '  <div class="ci-modal" id="lg-gh-modal" hidden>' +
-        '    <div class="ci-modal-box">' +
-        '      <h3>GitHub 同步</h3>' +
-        '      <div id="lg-gh-body"></div>' +
-        '      <div class="ci-modal-actions">' +
-        '        <button class="btn" id="lg-gh-close" type="button">关闭</button>' +
         '      </div>' +
         '    </div>' +
         '  </div>' +
@@ -1264,107 +1183,6 @@
         }
       });
 
-      // ---------- GitHub 同步 ----------
-      const ghModal = container.querySelector('#lg-gh-modal');
-      const ghBody = container.querySelector('#lg-gh-body');
-      ghModal.querySelector('#lg-gh-close').addEventListener('click', () => { ghModal.hidden = true; });
-      ghModal.addEventListener('click', (e) => { if (e.target === ghModal) ghModal.hidden = true; });
-
-      function ghStatusHtml() {
-        if (!G) return '<p class="muted">同步模块未加载。</p>';
-        if (G.isConnected()) {
-          return '<p style="margin:0 0 10px">已连接 GitHub，数据会自动同步到仓库 <code>data/ledger.json</code>。</p>' +
-            '<button class="btn ghost" type="button" id="lg-gh-logout">断开连接</button>' +
-            '<button class="btn" type="button" id="lg-gh-pull" style="margin-left:8px">立即拉取</button>';
-        }
-        const base = (G && G.getApiBase) ? G.getApiBase() : 'https://api.github.com';
-        const baseHint = base === 'https://api.github.com'
-          ? '若在中国大陆网络且报「无法连接」，可填一个能转发 api.github.com 的代理地址（需返回 CORS 头并透传 Authorization）。'
-          : '<span style="color:#c0392b">当前使用代理：' + base + '（<a href="#" id="lg-gh-clearbase">恢复默认</a>）</span>';
-        return '<p class="muted" style="margin:0 0 8px">把数据存到 GitHub 仓库（多端共享同一份，免导出导入）。' +
-          '请输入具有 <code>public_repo</code> 权限的 Personal Access Token：</p>' +
-          '<div class="ci-field"><span>Token</span>' +
-          '<input type="password" id="lg-gh-token" placeholder="ghp_xxx 或 github_pat_xxx" autocomplete="off" style="flex:1"></div>' +
-          '<div class="ci-field"><span>API地址</span>' +
-          '<input type="text" id="lg-gh-apibase" value="' + base + '" placeholder="https://api.github.com" autocomplete="off" style="flex:1"></div>' +
-          '<p class="muted" style="font-size:12px;margin:6px 0 10px">创建：GitHub → Settings → Developer settings → ' +
-          'Personal access tokens → 勾选 <code>public_repo</code>。Token 仅存本机浏览器，不上传。<br>' + baseHint + '</p>' +
-          '<button class="btn" type="button" id="lg-gh-connect">连接</button>';
-      }
-      function bindGhButtons() {
-        const connBtn = ghBody.querySelector('#lg-gh-connect');
-        if (connBtn) connBtn.addEventListener('click', doConnect);
-        const lo = ghBody.querySelector('#lg-gh-logout');
-        if (lo) lo.addEventListener('click', () => { G.logout(); paintGhModal(); App.toast('已断开连接'); });
-        const pull = ghBody.querySelector('#lg-gh-pull');
-        if (pull) pull.addEventListener('click', doPull);
-        const cb = ghBody.querySelector('#lg-gh-clearbase');
-        if (cb) cb.addEventListener('click', (e) => { e.preventDefault(); if (G.setApiBase) G.setApiBase(''); paintGhModal(); });
-      }
-      function paintGhModal() { ghBody.innerHTML = ghStatusHtml(); bindGhButtons(); }
-
-      async function doConnect() {
-        if (!G) return;
-        const input = ghBody.querySelector('#lg-gh-token');
-        const pat = input ? input.value : '';
-        const baseInput = ghBody.querySelector('#lg-gh-apibase');
-        if (baseInput && baseInput.value.trim() && G.setApiBase) G.setApiBase(baseInput.value);
-        ghBody.innerHTML = '<p>正在校验 Token…</p>';
-        try {
-          await G.connect(pat);
-        } catch (e) {
-          ghBody.innerHTML = '<p style="color:#c0392b">连接失败：' + (e.message || e) + '</p>' +
-            '<button class="btn" type="button" id="lg-gh-retry">重试</button>';
-          const rb = ghBody.querySelector('#lg-gh-retry');
-          if (rb) rb.addEventListener('click', paintGhModal);
-          return;
-        }
-        try {
-          const { content } = await G.readFile();
-          if (content && typeof content === 'object') {
-            state = normalizeState(content);
-            try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
-            markClean();
-            repaintAll();
-            App.toast('已从仓库拉取数据');
-          } else {
-            G.sync(state).catch(() => {}); // 仓库为空，上传本地
-            markClean();
-            App.toast('已连接，本地数据已上传');
-          }
-        } catch (e) {
-          App.toast('拉取仓库数据失败：' + (e.message || e));
-        }
-        paintGhModal();
-        if (afterConnectPush) { afterConnectPush = false; pushToGitHub(); }
-      }
-
-      async function doPull() {
-        if (!G) return;
-        try {
-          const { content } = await G.readFile();
-          if (content && typeof content === 'object') {
-            state = normalizeState(content);
-            try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
-            markClean();
-            repaintAll();
-            App.toast('已拉取最新数据');
-          } else {
-            App.toast('仓库暂无数据');
-          }
-        } catch (e) {
-          App.toast('拉取失败：' + (e.message || e));
-        }
-      }
-
-      container.querySelector('#lg-gh').addEventListener('click', () => { paintGhModal(); ghModal.hidden = false; });
-      container.querySelector('#lg-save-gh').addEventListener('click', pushToGitHub);
-
-      // 关闭/刷新页面前，若有未保存改动则提醒（隐私浏览下本机数据会被清空）
-      window.addEventListener('beforeunload', (e) => {
-        if (dirty && container.isConnected) { e.preventDefault(); e.returnValue = ''; }
-      });
-
       // ---------- 首次渲染 ----------
       paintBalance();
       paintCats();
@@ -1373,9 +1191,6 @@
       paintSummary();
       paintCalendar();
       updateHint();
-
-      // 打开即自动拉取 GitHub 最新数据（隐私浏览下无本地数据，以仓库为准）
-      initLoad();
     }
   });
 })();
