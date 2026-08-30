@@ -18,8 +18,34 @@
   const REPO = 'shvanten/my-mobile-app';
   const FILE_PATH = 'data/ledger.json';
   const TOKEN_KEY = 'gh_ledger_token';
+  const API_BASE_KEY = 'gh_api_base';
+
+  // API 基础地址：默认 api.github.com；在中国大陆常被防火墙拦截，
+  // 可在此配置一个能转发到 api.github.com 的代理（需返回 CORS 头并透传 Authorization）。
+  let API_BASE = (function () {
+    try { return localStorage.getItem(API_BASE_KEY) || 'https://api.github.com'; } catch (e) { return 'https://api.github.com'; }
+  })();
 
   function sleep(ms) { return new Promise((res) => setTimeout(res, ms)); }
+
+  function contentsUrl() {
+    return API_BASE + '/repos/' + REPO + '/contents/' + encodeURIComponent(FILE_PATH).replace(/%2F/g, '/');
+  }
+
+  // 统一 fetch：拦截「网络层失败」（GFW 拦截 / 离线 / DNS）→ 给出明确提示
+  async function ghFetch(url, opts) {
+    let r;
+    try {
+      r = await fetch(url, opts);
+    } catch (e) {
+      const msg = (e && e.message) || '';
+      if ((e && e.name === 'TypeError') || /Failed to fetch|NetworkError|network|abort/i.test(msg)) {
+        throw new Error('无法连接 GitHub API（' + API_BASE + '）：网络被防火墙拦截或离线，可能需要通过代理访问');
+      }
+      throw e;
+    }
+    return r;
+  }
 
   const GitHubSync = {
     repo: REPO,
@@ -30,6 +56,14 @@
 
     isConnected() { return !!this.token; },
 
+    getApiBase() { return API_BASE; },
+    setApiBase(url) {
+      url = (url || '').trim().replace(/\/+$/, '');
+      if (!url) url = 'https://api.github.com';
+      API_BASE = url;
+      try { localStorage.setItem(API_BASE_KEY, url); } catch (e) {}
+    },
+
     logout() {
       this.token = '';
       try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
@@ -39,12 +73,17 @@
     async connect(pat) {
       pat = (pat || '').trim();
       if (!pat) throw new Error('请输入有效的 Token');
-      const testUrl = 'https://api.github.com/repos/' + REPO + '/contents/' + encodeURIComponent(FILE_PATH).replace(/%2F/g, '/');
-      const r = await fetch(testUrl, {
+      const r = await ghFetch(contentsUrl(), {
         headers: { 'Authorization': 'Bearer ' + pat, 'Accept': 'application/vnd.github+json' },
       });
       if (r.status === 401) { this.token = ''; throw new Error('Token 无效或已过期'); }
-      if (r.status === 403) { this.token = ''; throw new Error('Token 无权限（需 public_repo 或 repo 范围）'); }
+      if (r.status === 403) {
+        this.token = '';
+        const tip = pat.indexOf('github_pat_') === 0
+          ? '（细粒度 Token 需在创建时指定本仓库，并授予 Contents 读写权限）'
+          : '（需 public_repo 或 repo 范围）';
+        throw new Error('Token 无权限' + tip);
+      }
       if (r.status !== 200 && r.status !== 404) {
         this.token = '';
         throw new Error('校验失败：HTTP ' + r.status);
@@ -56,10 +95,9 @@
 
     // 读取目标文件，返回 { content, sha }；文件不存在返回 { content:null, sha:null }
     async readFile() {
-      const url = 'https://api.github.com/repos/' + REPO + '/contents/' + encodeURIComponent(FILE_PATH).replace(/%2F/g, '/');
       const headers = { 'Accept': 'application/vnd.github+json' };
       if (this.token) headers['Authorization'] = 'Bearer ' + this.token; // 无 token 时公开读取（隐私浏览也能拉取）
-      const r = await fetch(url, { headers });
+      const r = await ghFetch(contentsUrl(), { headers });
       if (r.status === 404) return { content: null, sha: null };
       if (r.status === 401) { if (this.token) { this.token = ''; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} } throw new Error('Token 已失效，请重新连接'); }
       if (r.status === 403) {
@@ -80,7 +118,7 @@
         content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)))),
       };
       if (sha) body.sha = sha;
-      const r = await fetch('https://api.github.com/repos/' + REPO + '/contents/' + encodeURIComponent(FILE_PATH).replace(/%2F/g, '/'), {
+      const r = await ghFetch(contentsUrl(), {
         method: 'PUT',
         headers: { 'Authorization': 'Bearer ' + this.token, 'Accept': 'application/vnd.github+json' },
         body: JSON.stringify(body),

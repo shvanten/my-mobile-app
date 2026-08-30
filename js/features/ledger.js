@@ -1277,12 +1277,18 @@
             '<button class="btn ghost" type="button" id="lg-gh-logout">断开连接</button>' +
             '<button class="btn" type="button" id="lg-gh-pull" style="margin-left:8px">立即拉取</button>';
         }
+        const base = (G && G.getApiBase) ? G.getApiBase() : 'https://api.github.com';
+        const baseHint = base === 'https://api.github.com'
+          ? '若在中国大陆网络且报「无法连接」，可填一个能转发 api.github.com 的代理地址（需返回 CORS 头并透传 Authorization）。'
+          : '<span style="color:#c0392b">当前使用代理：' + base + '（<a href="#" id="lg-gh-clearbase">恢复默认</a>）</span>';
         return '<p class="muted" style="margin:0 0 8px">把数据存到 GitHub 仓库（多端共享同一份，免导出导入）。' +
           '请输入具有 <code>public_repo</code> 权限的 Personal Access Token：</p>' +
           '<div class="ci-field"><span>Token</span>' +
           '<input type="password" id="lg-gh-token" placeholder="ghp_xxx 或 github_pat_xxx" autocomplete="off" style="flex:1"></div>' +
+          '<div class="ci-field"><span>API地址</span>' +
+          '<input type="text" id="lg-gh-apibase" value="' + base + '" placeholder="https://api.github.com" autocomplete="off" style="flex:1"></div>' +
           '<p class="muted" style="font-size:12px;margin:6px 0 10px">创建：GitHub → Settings → Developer settings → ' +
-          'Personal access tokens → 勾选 <code>public_repo</code>。Token 仅存本机浏览器，不上传。</p>' +
+          'Personal access tokens → 勾选 <code>public_repo</code>。Token 仅存本机浏览器，不上传。<br>' + baseHint + '</p>' +
           '<button class="btn" type="button" id="lg-gh-connect">连接</button>';
       }
       function bindGhButtons() {
@@ -1292,6 +1298,8 @@
         if (lo) lo.addEventListener('click', () => { G.logout(); paintGhModal(); App.toast('已断开连接'); });
         const pull = ghBody.querySelector('#lg-gh-pull');
         if (pull) pull.addEventListener('click', doPull);
+        const cb = ghBody.querySelector('#lg-gh-clearbase');
+        if (cb) cb.addEventListener('click', (e) => { e.preventDefault(); if (G.setApiBase) G.setApiBase(''); paintGhModal(); });
       }
       function paintGhModal() { ghBody.innerHTML = ghStatusHtml(); bindGhButtons(); }
 
@@ -1299,6 +1307,8 @@
         if (!G) return;
         const input = ghBody.querySelector('#lg-gh-token');
         const pat = input ? input.value : '';
+        const baseInput = ghBody.querySelector('#lg-gh-apibase');
+        if (baseInput && baseInput.value.trim() && G.setApiBase) G.setApiBase(baseInput.value);
         ghBody.innerHTML = '<p>正在校验 Token…</p>';
         try {
           await G.connect(pat);
