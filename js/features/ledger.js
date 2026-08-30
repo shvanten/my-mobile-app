@@ -78,12 +78,86 @@
         };
       }
       function save() {
-        localStorage.setItem(KEY, JSON.stringify(state));
-        // 已连接 GitHub 时，把数据写回仓库文件（异步、失败仅提示，不阻塞）
-        if (G && G.isConnected()) {
-          G.sync(state).catch((err) => {
-            App.toast('同步 GitHub 失败：' + (err && err.message ? err.message : '未知错误'));
-          });
+        // 仅写入本机会话缓存（隐私浏览下关闭即清空）；改动统一在「保存到 GitHub」按钮时推回仓库
+        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+        markDirty();
+      }
+
+      // ---------- GitHub 自动拉取 / 手动保存 ----------
+      let dirty = false;     // 是否有未保存到 GitHub 的改动
+      let loaded = false;    // 是否已从 GitHub 加载过（或确认离线）
+      let afterConnectPush = false; // 连接成功后是否立即推回
+
+      function normalizeState(o) {
+        o = (o && typeof o === 'object') ? o : {};
+        if (!o.accounts || typeof o.accounts !== 'object') o.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
+        if (!Array.isArray(o.records)) o.records = [];
+        if (!Array.isArray(o.cats) || !o.cats.length) o.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
+        if (typeof o.budget !== 'number') o.budget = 0;
+        o.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
+        return o;
+      }
+      function repaintAll() {
+        paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
+      }
+      function refreshSyncStatus() {
+        const el = container.querySelector('#lg-sync-status');
+        if (!el) return;
+        if (!G) { el.textContent = '（未启用 GitHub 同步）'; el.className = 'lg-sync-status'; return; }
+        if (!loaded) { el.textContent = '正在从 GitHub 加载最新数据…'; el.className = 'lg-sync-status loading'; return; }
+        if (dirty) { el.textContent = '● 有改动未保存，点右侧按钮存到 GitHub'; el.className = 'lg-sync-status dirty'; }
+        else { el.textContent = G.isConnected() ? '✓ 已与 GitHub 同步' : '（未连接，改动仅存本机）'; el.className = 'lg-sync-status clean'; }
+      }
+      function markDirty() { dirty = true; loaded = true; refreshSyncStatus(); }
+      function markClean() { dirty = false; loaded = true; refreshSyncStatus(); }
+
+      // 打开页面即自动拉取 GitHub 上的最新数据（公开仓库无需 Token 也可读）
+      async function initLoad() {
+        if (!G) { markClean(); return; }
+        refreshSyncStatus();
+        try {
+          const res = await G.readFile();
+          if (res && res.content && typeof res.content === 'object') {
+            state = normalizeState(res.content);
+            try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+            markClean();
+            repaintAll();
+            App.toast('已从 GitHub 加载最新数据');
+          } else {
+            markClean();
+            repaintAll();
+          }
+        } catch (e) {
+          markClean();
+          App.toast('未能从 GitHub 拉取（' + (e && e.message ? e.message : '离线') + '），使用本机缓存');
+        }
+      }
+
+      // 手动保存：把改动推回 GitHub；未连接时引导先输入 Token
+      async function pushToGitHub() {
+        if (!G) { App.toast('同步模块未加载'); return; }
+        if (!G.isConnected()) {
+          afterConnectPush = true;
+          paintGhModal();
+          ghModal.hidden = false;
+          App.toast('请先输入 Token 连接 GitHub，再保存');
+          return;
+        }
+        const el = container.querySelector('#lg-sync-status');
+        if (el) { el.textContent = '正在保存到 GitHub…'; el.className = 'lg-sync-status loading'; }
+        try {
+          await G.sync(state);
+          markClean();
+          App.toast('已保存到 GitHub ✓');
+        } catch (e) {
+          if (e && e.status === 409) {
+            try { const { sha } = await G.readFile(); await G.writeFile(state, sha); markClean(); App.toast('已保存（已合并仓库最新版本）'); return; }
+            catch (e2) { /* fallthrough */ }
+          }
+          const msg = (e && e.message) ? e.message : '未知错误';
+          const st = container.querySelector('#lg-sync-status');
+          if (st) { st.textContent = '● 保存失败：' + msg; st.className = 'lg-sync-status dirty'; }
+          App.toast('保存到 GitHub 失败：' + msg);
         }
       }
 
@@ -161,10 +235,14 @@
         '  <div class="lg-head">' +
         '    <h2>记账</h2>' +
         '    <div class="lg-head-actions">' +
-        '      <button class="btn ghost" type="button" id="lg-gh">🔗 同步</button>' +
+        '      <button class="btn ghost" type="button" id="lg-gh">🔗 GitHub</button>' +
         '      <button class="btn ghost" type="button" id="lg-cats-manage">🏷️ 分类</button>' +
         '      <button class="btn ghost lg-set" type="button" id="lg-set">💰 设置</button>' +
         '    </div>' +
+        '  </div>' +
+        '  <div class="lg-sync-bar" id="lg-sync-bar">' +
+        '    <span class="lg-sync-status" id="lg-sync-status">正在从 GitHub 加载…</span>' +
+        '    <button class="btn" type="button" id="lg-save-gh">💾 保存到 GitHub</button>' +
         '  </div>' +
         '  <div class="lg-pages" id="lg-pages">' +
         '    <div class="lg-page" data-page="main">' +
@@ -1226,22 +1304,21 @@
         try {
           const { content } = await G.readFile();
           if (content && typeof content === 'object') {
-            state = content;
-            if (!Array.isArray(state.records)) state.records = [];
-            if (!state.accounts) state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
-            if (!Array.isArray(state.cats)) state.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
-            if (typeof state.budget !== 'number') state.budget = 0;
-            state.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
-            paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
+            state = normalizeState(content);
+            try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+            markClean();
+            repaintAll();
             App.toast('已从仓库拉取数据');
           } else {
             G.sync(state).catch(() => {}); // 仓库为空，上传本地
+            markClean();
             App.toast('已连接，本地数据已上传');
           }
         } catch (e) {
           App.toast('拉取仓库数据失败：' + (e.message || e));
         }
         paintGhModal();
+        if (afterConnectPush) { afterConnectPush = false; pushToGitHub(); }
       }
 
       async function doPull() {
@@ -1249,13 +1326,10 @@
         try {
           const { content } = await G.readFile();
           if (content && typeof content === 'object') {
-            state = content;
-            if (!Array.isArray(state.records)) state.records = [];
-            if (!state.accounts) state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
-            if (!Array.isArray(state.cats)) state.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
-            if (typeof state.budget !== 'number') state.budget = 0;
-            state.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
-            paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
+            state = normalizeState(content);
+            try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+            markClean();
+            repaintAll();
             App.toast('已拉取最新数据');
           } else {
             App.toast('仓库暂无数据');
@@ -1266,6 +1340,12 @@
       }
 
       container.querySelector('#lg-gh').addEventListener('click', () => { paintGhModal(); ghModal.hidden = false; });
+      container.querySelector('#lg-save-gh').addEventListener('click', pushToGitHub);
+
+      // 关闭/刷新页面前，若有未保存改动则提醒（隐私浏览下本机数据会被清空）
+      window.addEventListener('beforeunload', (e) => {
+        if (dirty && container.isConnected) { e.preventDefault(); e.returnValue = ''; }
+      });
 
       // ---------- 首次渲染 ----------
       paintBalance();
@@ -1276,20 +1356,8 @@
       paintCalendar();
       updateHint();
 
-      // 已连接 GitHub 时，打开即拉取仓库最新数据（多端共享同一份）
-      if (G && G.isConnected()) {
-        G.readFile().then((res) => {
-          if (res && res.content && typeof res.content === 'object') {
-            state = res.content;
-            if (!Array.isArray(state.records)) state.records = [];
-            if (!state.accounts) state.accounts = JSON.parse(JSON.stringify(DEFAULT_ACCOUNTS));
-            if (!Array.isArray(state.cats)) state.cats = JSON.parse(JSON.stringify(DEFAULT_CATS));
-            if (typeof state.budget !== 'number') state.budget = 0;
-            state.records.forEach((r) => { if (r && !r.account) r.account = 'cash'; });
-            paintBalance(); paintCats(); paintAccts(); paintRecords(); paintSummary(); paintCalendar();
-          }
-        }).catch((e) => { /* 离线则用本地数据，不影响使用 */ });
-      }
+      // 打开即自动拉取 GitHub 最新数据（隐私浏览下无本地数据，以仓库为准）
+      initLoad();
     }
   });
 })();

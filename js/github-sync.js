@@ -56,11 +56,16 @@
 
     // 读取目标文件，返回 { content, sha }；文件不存在返回 { content:null, sha:null }
     async readFile() {
-      const r = await fetch('https://api.github.com/repos/' + REPO + '/contents/' + encodeURIComponent(FILE_PATH).replace(/%2F/g, '/'), {
-        headers: { 'Authorization': 'Bearer ' + this.token, 'Accept': 'application/vnd.github+json' },
-      });
+      const url = 'https://api.github.com/repos/' + REPO + '/contents/' + encodeURIComponent(FILE_PATH).replace(/%2F/g, '/');
+      const headers = { 'Accept': 'application/vnd.github+json' };
+      if (this.token) headers['Authorization'] = 'Bearer ' + this.token; // 无 token 时公开读取（隐私浏览也能拉取）
+      const r = await fetch(url, { headers });
       if (r.status === 404) return { content: null, sha: null };
-      if (r.status === 401) { this.token = ''; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} throw new Error('Token 已失效，请重新连接'); }
+      if (r.status === 401) { if (this.token) { this.token = ''; try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} } throw new Error('Token 已失效，请重新连接'); }
+      if (r.status === 403) {
+        if (!this.token) throw new Error('GitHub 限流（未登录每小时 60 次），稍后再试或先连接 Token');
+        throw new Error('Token 无权限（需 public_repo 或 repo 范围）');
+      }
       if (!r.ok) throw new Error('读取失败：HTTP ' + r.status);
       const d = await r.json();
       let content = null;
