@@ -130,12 +130,23 @@
       let fScope = 'all';
       let fCat = '';
       let fAcct = '';
+      // 转账模式：'normal' 记账（支出/收入）；'transfer' 账户间互转（不计收支、不影响预算）
+      let pendingMode = 'normal';
+      let transferFrom = 'wechat';
+      let transferTo = 'alipay';
 
-      // 余额：各账户余额之和
+      // 余额：各账户余额之和（转账从 from 扣、加到 to，净额不变）
       function accountBalance(k) {
         const a = state.accounts[k];
         let b = a ? a.init : 0;
-        state.records.forEach((r) => { if (r.account === k) b += (r.type === 'inc' ? r.amount : -r.amount); });
+        state.records.forEach((r) => {
+          if (r.type === 'transfer') {
+            if (r.from === k) b -= r.amount;
+            if (r.to === k) b += r.amount;
+          } else if (r.account === k) {
+            b += (r.type === 'inc' ? r.amount : -r.amount);
+          }
+        });
         return b;
       }
       function balance() {
@@ -175,9 +186,25 @@
         '      <div class="lg-accounts" id="lg-accounts"></div>' +
         '      <input id="lg-note" class="lg-enter-note" type="text" maxlength="20" placeholder="备注（可选）" />' +
         '      <div class="lg-enter-hint" id="lg-enter-hint"></div>' +
-        '      <div class="lg-cats-title">选择类型（可选）</div>' +
+        '      <div class="lg-mode" id="lg-mode">' +
+        '        <button type="button" class="on" data-mode="normal">记账</button>' +
+        '        <button type="button" data-mode="transfer">转账</button>' +
+        '      </div>' +
+        '      <div class="lg-transfer" id="lg-transfer" hidden>' +
+        '        <div class="lg-transfer-row">' +
+        '          <select id="lg-transfer-from" class="lg-filter-sel">' +
+        '            ' + ACCOUNTS.map((a) => '<option value="' + a.k + '"' + (a.k === transferFrom ? ' selected' : '') + '>' + a.n + '</option>').join('') +
+        '          </select>' +
+        '          <span class="lg-transfer-arrow">→</span>' +
+        '          <select id="lg-transfer-to" class="lg-filter-sel">' +
+        '            ' + ACCOUNTS.map((a) => '<option value="' + a.k + '"' + (a.k === transferTo ? ' selected' : '') + '>' + a.n + '</option>').join('') +
+        '          </select>' +
+        '        </div>' +
+        '        <p class="muted" style="margin:4px 0 0;font-size:12px">仅在本账户间搬动资金，不计入收支、不影响预算。</p>' +
+        '      </div>' +
+        '      <div class="lg-cats-title" id="lg-cats-sec-title">选择类型（可选）</div>' +
         '      <div class="lg-cats" id="lg-cats"></div>' +
-        '      <div class="lg-accts-title">账户（这笔钱来自 / 存入）</div>' +
+        '      <div class="lg-accts-title" id="lg-accts-sec-title">账户（这笔钱来自 / 存入）</div>' +
         '      <div class="lg-accts" id="lg-accts"></div>' +
         '      <div class="lg-rec-head">' +
         '        <span class="lg-cats-title" style="margin-top:14px">记录</span>' +
@@ -293,6 +320,7 @@
         let inc = 0, exp = 0;
         state.records.forEach((r) => {
           if (r.date.slice(0, 7) !== ym) return;
+          if (r.type === 'transfer') return;
           if (r.type === 'inc') inc += r.amount; else exp += r.amount;
         });
         balSubEl.textContent = '本月收入 ' + money(inc) + ' · 支出 ' + money(exp);
@@ -331,6 +359,7 @@
         let firstDate = t, totalExp = 0;
         state.records.forEach((r) => {
           if (r.date < firstDate) firstDate = r.date;
+          if (r.type === 'transfer') return;
           const wk = weekStart(r.date);
           const mo = r.date.slice(0, 7);
           byWeek[wk] = byWeek[wk] || { exp: 0, inc: 0 };
@@ -481,6 +510,12 @@
       }
       function updateHint() {
         if (!enterHint) return;
+        if (pendingMode === 'transfer') {
+          const fA = ACCOUNTS.find((a) => a.k === transferFrom);
+          const tA = ACCOUNTS.find((a) => a.k === transferTo);
+          enterHint.textContent = '将从「' + (fA ? fA.n : transferFrom) + '」转入「' + (tA ? tA.n : transferTo) + '」，不影响收支与预算。';
+          return;
+        }
         const acc = ACCOUNTS.find((a) => a.k === pendingAccount);
         const accName = acc ? acc.n : '';
         enterHint.textContent = pendingType
@@ -495,7 +530,10 @@
           if (fScope === 'month' && r.date.slice(0, 7) !== t.slice(0, 7)) return false;
           if (fScope === 'year' && r.date.slice(0, 4) !== t.slice(0, 4)) return false;
           if (fCat && r.cat !== fCat) return false;
-          if (fAcct && r.account !== fAcct) return false;
+          if (fAcct) {
+            if (r.type === 'transfer') { if (r.from !== fAcct && r.to !== fAcct) return false; }
+            else if (r.account !== fAcct) return false;
+          }
           return true;
         });
       }
@@ -508,33 +546,62 @@
           return;
         }
         recEl.innerHTML = list.map((r) => {
-          const cat = cats().find((c) => c.n === r.cat) || { e: r.cat ? '🏷️' : '❓', n: r.cat || '待分类' };
-          const acc = ACCOUNTS.find((a) => a.k === r.account) || { e: '💵', n: '现金' };
-          const sign = r.type === 'inc' ? '+' : '-';
-          const cls = r.type === 'inc' ? ' inc' : ' exp';
-          const noCat = !r.cat;
           const note = r.note ? ' · ' + App.escapeHtml(r.note) : '';
-          let html = '<div class="lg-rec-item' + cls + (noCat ? ' no-cat' : '') + '" data-id="' + r.id + '">' +
-            '  <span class="lg-rec-e">' + cat.e + '</span>' +
-            '  <span class="lg-rec-meta"><span class="lg-rec-cat">' + App.escapeHtml(cat.n) + '</span>' +
-            '    <span class="lg-rec-date">' + r.date + ' · ' + acc.e + acc.n + note + '</span></span>' +
-            '  <span class="lg-rec-amt">' + sign + money(r.amount) + '</span>' +
-            '  <button class="lg-rec-del" type="button" data-del="' + r.id + '" aria-label="删除">✕</button>' +
-            '</div>';
+          let html, cls;
+          if (r.type === 'transfer') {
+            const fA = ACCOUNTS.find((a) => a.k === r.from) || { e: '💚', n: '微信' };
+            const tA = ACCOUNTS.find((a) => a.k === r.to) || { e: '🔷', n: '支付宝' };
+            cls = ' transfer';
+            html = '<div class="lg-rec-item' + cls + '" data-id="' + r.id + '">' +
+              '  <span class="lg-rec-e">🔄</span>' +
+              '  <span class="lg-rec-meta"><span class="lg-rec-cat">转账</span>' +
+              '    <span class="lg-rec-date">' + r.date + ' · ' + fA.e + fA.n + ' → ' + tA.e + tA.n + note + '</span></span>' +
+              '  <span class="lg-rec-amt lg-rec-amt-tr">' + money(r.amount) + '</span>' +
+              '  <button class="lg-rec-del" type="button" data-del="' + r.id + '" aria-label="删除">✕</button>' +
+              '</div>';
+          } else {
+            const cat = cats().find((c) => c.n === r.cat) || { e: r.cat ? '🏷️' : '❓', n: r.cat || '待分类' };
+            const acc = ACCOUNTS.find((a) => a.k === r.account) || { e: '💵', n: '现金' };
+            const sign = r.type === 'inc' ? '+' : '-';
+            cls = r.type === 'inc' ? ' inc' : ' exp';
+            const noCat = !r.cat;
+            html = '<div class="lg-rec-item' + cls + (noCat ? ' no-cat' : '') + '" data-id="' + r.id + '">' +
+              '  <span class="lg-rec-e">' + cat.e + '</span>' +
+              '  <span class="lg-rec-meta"><span class="lg-rec-cat">' + App.escapeHtml(cat.n) + '</span>' +
+              '    <span class="lg-rec-date">' + r.date + ' · ' + acc.e + acc.n + note + '</span></span>' +
+              '  <span class="lg-rec-amt">' + sign + money(r.amount) + '</span>' +
+              '  <button class="lg-rec-del" type="button" data-del="' + r.id + '" aria-label="删除">✕</button>' +
+              '</div>';
+          }
           if (editingId === r.id) {
+            const acctBtns = (sel, attr) => ACCOUNTS.map((a) =>
+              '<button class="lg-rec-acct' + (sel === a.k ? ' on' : '') + '" type="button" data-' + attr + '="' + a.k + '">' + a.e + ' ' + a.n + '</button>'
+            ).join('');
+            let editInner;
+            if (r.type === 'transfer') {
+              editInner =
+                '  <div class="ci-field"><span>日期</span><input type="date" class="lg-edit-date" value="' + r.date + '"></div>' +
+                '  <div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-edit-amt" value="' + r.amount + '"></div>' +
+                '  <div class="lg-edit-label">转出账户</div>' +
+                '  <div class="lg-rec-accts">' + acctBtns(r.from, 'from') + '</div>' +
+                '  <div class="lg-edit-label">转入账户</div>' +
+                '  <div class="lg-rec-accts">' + acctBtns(r.to, 'to') + '</div>' +
+                '  <button class="btn ghost lg-rec-cat-add" type="button" data-open-cats="1">＋ 新建分类</button>';
+            } else {
+              editInner =
+                '  <div class="ci-field"><span>日期</span><input type="date" class="lg-edit-date" value="' + r.date + '"></div>' +
+                '  <div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-edit-amt" value="' + r.amount + '"></div>' +
+                '  <div class="lg-edit-label">类型</div>' +
+                '  <div class="lg-rec-cats">' +
+                cats().map((c) => '<button class="lg-rec-cat' + (c.type === 'inc' ? ' inc' : '') +
+                  (r.cat === c.n ? ' on' : '') + '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
+                '</div>' +
+                '  <div class="lg-edit-label">账户</div>' +
+                '  <div class="lg-rec-accts">' + acctBtns(r.account, 'acct') + '</div>' +
+                '  <button class="btn ghost lg-rec-cat-add" type="button" data-open-cats="1">＋ 新建分类</button>';
+            }
             html += '<div class="lg-rec-edit" data-id="' + r.id + '">' +
-              '  <div class="ci-field"><span>日期</span><input type="date" class="lg-edit-date" value="' + r.date + '"></div>' +
-              '  <div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-edit-amt" value="' + r.amount + '"></div>' +
-              '  <div class="lg-edit-label">类型</div>' +
-              '  <div class="lg-rec-cats">' +
-              cats().map((c) => '<button class="lg-rec-cat' + (c.type === 'inc' ? ' inc' : '') +
-                (r.cat === c.n ? ' on' : '') + '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
-              '</div>' +
-              '  <div class="lg-edit-label">账户</div>' +
-              '  <div class="lg-rec-accts">' +
-              ACCOUNTS.map((a) => '<button class="lg-rec-acct' + (r.account === a.k ? ' on' : '') +
-                '" type="button" data-acct="' + a.k + '">' + a.e + ' ' + a.n + '</button>').join('') +
-              '</div>' +
+              editInner +
               '  <div class="lg-rec-edit-actions">' +
               '    <button class="btn ghost" type="button" data-edit-cancel="' + r.id + '">取消</button>' +
               '    <button class="btn" type="button" data-edit-save="' + r.id + '">保存</button>' +
@@ -549,6 +616,30 @@
       function doRecord() {
         const amt = parseFloat(amountInput.value);
         if (!amt || amt <= 0) { App.toast('请输入金额'); return; }
+        if (pendingMode === 'transfer') {
+          if (transferFrom === transferTo) { App.toast('转出与转入账户不能相同'); return; }
+          const fA = ACCOUNTS.find((a) => a.k === transferFrom) || { n: transferFrom };
+          const tA = ACCOUNTS.find((a) => a.k === transferTo) || { n: transferTo };
+          state.records.push({
+            id: 'r' + Date.now(),
+            date: todayStr(),
+            type: 'transfer',
+            from: transferFrom,
+            to: transferTo,
+            account: transferFrom,
+            amount: Math.round(amt * 100) / 100,
+            note: noteInput.value.trim(),
+          });
+          save();
+          amountInput.value = '';
+          noteInput.value = '';
+          paintBalance();
+          paintRecords();
+          paintSummary();
+          paintCalendar();
+          App.toast('已转账：' + fA.n + ' → ' + tA.n);
+          return;
+        }
         const cat = pendingType;
         state.records.push({
           id: 'r' + Date.now(),
@@ -593,6 +684,31 @@
         updateHint();
       });
 
+      // 记账 / 转账 模式切换
+      const modeEl = container.querySelector('#lg-mode');
+      const transferEl = container.querySelector('#lg-transfer');
+      const transferFromEl = container.querySelector('#lg-transfer-from');
+      const transferToEl = container.querySelector('#lg-transfer-to');
+      const catsSecTitle = container.querySelector('#lg-cats-sec-title');
+      const acctsSecTitle = container.querySelector('#lg-accts-sec-title');
+      modeEl.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-mode]');
+        if (!b) return;
+        pendingMode = b.dataset.mode;
+        pendingType = null;
+        modeEl.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        const isTransfer = pendingMode === 'transfer';
+        transferEl.hidden = !isTransfer;
+        catsSecTitle.hidden = isTransfer;
+        catsEl.hidden = isTransfer;
+        acctsSecTitle.hidden = isTransfer;
+        acctsEl.hidden = isTransfer;
+        paintCats();
+        updateHint();
+      });
+      transferFromEl.addEventListener('change', () => { transferFrom = transferFromEl.value; });
+      transferToEl.addEventListener('change', () => { transferTo = transferToEl.value; });
+
       // 筛选联动
       filterScope.addEventListener('change', () => { fScope = filterScope.value; paintRecords(); });
       filterCat.addEventListener('change', () => { fCat = filterCat.value; paintRecords(); });
@@ -605,7 +721,7 @@
           const id = del.dataset.del;
           const r = state.records.find((x) => x.id === id);
           if (!r) return;
-          App.confirm('删除记录', '确认删除这笔「' + (r.cat || '待分类') + ' ' + money(r.amount) + '」？', () => {
+          App.confirm('删除记录', '确认删除这笔「' + (r.type === 'transfer' ? '转账' : (r.cat || '待分类')) + ' ' + money(r.amount) + '」？', () => {
             state.records = state.records.filter((x) => x.id !== id);
             save();
             editingId = null;
@@ -627,14 +743,22 @@
             const amtVal = parseFloat(block.querySelector('.lg-edit-amt').value);
             if (!dateVal) { App.toast('请选择日期'); return; }
             if (!amtVal || amtVal <= 0) { App.toast('请输入有效金额'); return; }
-            const catBtn = block.querySelector('.lg-rec-cat.on');
-            const acctBtn = block.querySelector('.lg-rec-acct.on');
-            const cat = catBtn ? cats().find((c) => c.n === catBtn.dataset.cat) : null;
-            const accK = acctBtn ? acctBtn.dataset.acct : r.account;
             r.date = dateVal;
             r.amount = Math.round(amtVal * 100) / 100;
-            if (cat) { r.cat = cat.n; r.type = cat.type; }
-            r.account = accK;
+            if (r.type === 'transfer') {
+              const fromBtn = block.querySelector('[data-from].on');
+              const toBtn = block.querySelector('[data-to].on');
+              if (fromBtn) r.from = fromBtn.dataset.from;
+              if (toBtn) r.to = toBtn.dataset.to;
+              r.account = r.from;
+            } else {
+              const catBtn = block.querySelector('.lg-rec-cat.on');
+              const acctBtn = block.querySelector('.lg-rec-acct.on');
+              const cat = catBtn ? cats().find((c) => c.n === catBtn.dataset.cat) : null;
+              const accK = acctBtn ? acctBtn.dataset.acct : r.account;
+              if (cat) { r.cat = cat.n; r.type = cat.type; }
+              r.account = accK;
+            }
             save();
             editingId = null;
             paintBalance();
@@ -672,6 +796,24 @@
             r.account = k; save();
             paintBalance(); paintSummary(); paintCalendar(); paintRecords();
           }
+          return;
+        }
+        const fromBtn = e.target.closest('[data-from]');
+        if (fromBtn) {
+          const block = fromBtn.closest('.lg-rec-edit');
+          block.querySelectorAll('[data-from]').forEach((b) => b.classList.remove('on'));
+          fromBtn.classList.add('on');
+          const r = state.records.find((x) => x.id === block.dataset.id);
+          if (r) { r.from = fromBtn.dataset.from; r.account = r.from; try { save(); } catch (e) {} }
+          return;
+        }
+        const toBtn = e.target.closest('[data-to]');
+        if (toBtn) {
+          const block = toBtn.closest('.lg-rec-edit');
+          block.querySelectorAll('[data-to]').forEach((b) => b.classList.remove('on'));
+          toBtn.classList.add('on');
+          const r = state.records.find((x) => x.id === block.dataset.id);
+          if (r) { r.to = toBtn.dataset.to; try { save(); } catch (e) {} }
           return;
         }
         const item = e.target.closest('.lg-rec-item');
@@ -779,6 +921,7 @@
         const dayMap = {};
         state.records.forEach((r) => {
           if (r.date.slice(0, 7) !== ym) return;
+          if (r.type === 'transfer') return;
           const d = parseInt(r.date.slice(8, 10), 10);
           dayMap[d] = dayMap[d] || { exp: 0, inc: 0 };
           if (r.type === 'inc') dayMap[d].inc += r.amount; else dayMap[d].exp += r.amount;
@@ -812,7 +955,7 @@
         const list = state.records.filter((r) => r.date === selDay)
           .sort((a, b) => b.id.localeCompare(a.id));
         let exp = 0, inc = 0;
-        list.forEach((r) => { if (r.type === 'inc') inc += r.amount; else exp += r.amount; });
+        list.forEach((r) => { if (r.type === 'transfer') return; if (r.type === 'inc') inc += r.amount; else exp += r.amount; });
         const head = '<div class="lg-cal-detail-head">' + selDay +
           ' · 收 ' + money(inc) + ' / 支 ' + money(exp) + ' / 净 ' + money(inc - exp) +
           ' <button class="btn ghost lg-cal-add-btn" type="button" data-cal-add="1">＋ 记一笔</button></div>';
@@ -821,33 +964,60 @@
           return;
         }
         const rows = list.map((r) => {
-          const cat = cats().find((c) => c.n === r.cat) || { e: r.cat ? '🏷️' : '❓', n: r.cat || '待分类' };
-          const acc = ACCOUNTS.find((a) => a.k === r.account) || { e: '💵', n: '现金' };
-          const sign = r.type === 'inc' ? '+' : '−';
           const note = r.note ? ' · ' + App.escapeHtml(r.note) : '';
-          let html = '<div class="lg-cal-item ' + (r.type === 'inc' ? 'inc' : 'exp') +
-            (calEditId === r.id ? ' editing' : '') + '" data-id="' + r.id + '">' +
-            '<span class="lg-cal-item-e">' + cat.e + '</span>' +
-            '<span class="lg-cal-item-meta"><span class="lg-cal-item-cat">' + App.escapeHtml(cat.n) + '</span>' +
-            '<span class="lg-cal-item-acc">' + acc.e + acc.n + note + '</span></span>' +
-            '<span class="lg-cal-item-amt">' + sign + money(r.amount) + '</span>' +
-            (calEditId === r.id ? '' :
-              '<button class="lg-cal-del" type="button" data-cal-del="' + r.id + '" aria-label="删除">✕</button>') +
-            '</div>';
+          let html, cls;
+          if (r.type === 'transfer') {
+            const fA = ACCOUNTS.find((a) => a.k === r.from) || { e: '💚', n: '微信' };
+            const tA = ACCOUNTS.find((a) => a.k === r.to) || { e: '🔷', n: '支付宝' };
+            cls = 'transfer';
+            html = '<div class="lg-cal-item ' + cls + (calEditId === r.id ? ' editing' : '') + '" data-id="' + r.id + '">' +
+              '<span class="lg-cal-item-e">🔄</span>' +
+              '<span class="lg-cal-item-meta"><span class="lg-cal-item-cat">转账</span>' +
+              '<span class="lg-cal-item-acc">' + fA.e + fA.n + ' → ' + tA.e + tA.n + note + '</span></span>' +
+              '<span class="lg-cal-item-amt lg-cal-amt-tr">' + money(r.amount) + '</span>' +
+              (calEditId === r.id ? '' :
+                '<button class="lg-cal-del" type="button" data-cal-del="' + r.id + '" aria-label="删除">✕</button>') +
+              '</div>';
+          } else {
+            const cat = cats().find((c) => c.n === r.cat) || { e: r.cat ? '🏷️' : '❓', n: r.cat || '待分类' };
+            const acc = ACCOUNTS.find((a) => a.k === r.account) || { e: '💵', n: '现金' };
+            const sign = r.type === 'inc' ? '+' : '−';
+            cls = r.type === 'inc' ? 'inc' : 'exp';
+            html = '<div class="lg-cal-item ' + cls + (calEditId === r.id ? ' editing' : '') + '" data-id="' + r.id + '">' +
+              '<span class="lg-cal-item-e">' + cat.e + '</span>' +
+              '<span class="lg-cal-item-meta"><span class="lg-cal-item-cat">' + App.escapeHtml(cat.n) + '</span>' +
+              '<span class="lg-cal-item-acc">' + acc.e + acc.n + note + '</span></span>' +
+              '<span class="lg-cal-item-amt">' + sign + money(r.amount) + '</span>' +
+              (calEditId === r.id ? '' :
+                '<button class="lg-cal-del" type="button" data-cal-del="' + r.id + '" aria-label="删除">✕</button>') +
+              '</div>';
+          }
           if (calEditId === r.id) {
+            const acctBtns = (sel, attr) => ACCOUNTS.map((a) =>
+              '<button class="lg-rec-acct' + (sel === a.k ? ' on' : '') + '" type="button" data-' + attr + '="' + a.k + '">' + a.e + ' ' + a.n + '</button>'
+            ).join('');
+            let editInner;
+            if (r.type === 'transfer') {
+              editInner =
+                '<div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-cal-edit-amt" value="' + r.amount + '"></div>' +
+                '<div class="lg-edit-label">转出账户</div>' +
+                '<div class="lg-rec-accts">' + acctBtns(r.from, 'from') + '</div>' +
+                '<div class="lg-edit-label">转入账户</div>' +
+                '<div class="lg-rec-accts">' + acctBtns(r.to, 'to') + '</div>';
+            } else {
+              editInner =
+                '<div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-cal-edit-amt" value="' + r.amount + '"></div>' +
+                '<div class="lg-edit-label">类型</div>' +
+                '<div class="lg-rec-cats">' +
+                cats().map((c) => '<button class="lg-rec-cat' + (c.type === 'inc' ? ' inc' : '') +
+                  (r.cat === c.n ? ' on' : '') + '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
+                '</div>' +
+                '<button class="btn ghost lg-rec-cat-add" type="button" data-open-cats="1">＋ 新建分类</button>' +
+                '<div class="lg-edit-label">账户</div>' +
+                '<div class="lg-rec-accts">' + acctBtns(r.account, 'acct') + '</div>';
+            }
             html += '<div class="lg-rec-edit" data-id="' + r.id + '">' +
-              '<div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-cal-edit-amt" value="' + r.amount + '"></div>' +
-              '<div class="lg-edit-label">类型</div>' +
-              '<div class="lg-rec-cats">' +
-              cats().map((c) => '<button class="lg-rec-cat' + (c.type === 'inc' ? ' inc' : '') +
-                (r.cat === c.n ? ' on' : '') + '" type="button" data-cat="' + App.escapeHtml(c.n) + '">' + c.e + ' ' + c.n + '</button>').join('') +
-              '</div>' +
-              '<button class="btn ghost lg-rec-cat-add" type="button" data-open-cats="1">＋ 新建分类</button>' +
-              '<div class="lg-edit-label">账户</div>' +
-              '<div class="lg-rec-accts">' +
-              ACCOUNTS.map((a) => '<button class="lg-rec-acct' + (r.account === a.k ? ' on' : '') +
-                '" type="button" data-acct="' + a.k + '">' + a.e + ' ' + a.n + '</button>').join('') +
-              '</div>' +
+              editInner +
               '<div class="lg-rec-edit-actions">' +
               '  <button class="btn ghost" type="button" data-cal-edit-cancel="1">取消</button>' +
               '  <button class="btn" type="button" data-cal-edit-save="1">保存</button>' +
@@ -879,7 +1049,9 @@
       calDetailEl.addEventListener('click', (e) => {
         const addBtn = e.target.closest('[data-cal-add]');
         if (addBtn) {
-          const r = { id: 'r' + Date.now(), date: selDay, cat: '', type: 'exp', account: pendingAccount, amount: 0, note: '' };
+          const r = pendingMode === 'transfer'
+            ? { id: 'r' + Date.now(), date: selDay, type: 'transfer', from: transferFrom, to: transferTo, account: transferFrom, amount: 0, note: '' }
+            : { id: 'r' + Date.now(), date: selDay, cat: '', type: 'exp', account: pendingAccount, amount: 0, note: '' };
           state.records.push(r);
           calEditId = r.id;
           paintCalDetail();
@@ -894,15 +1066,23 @@
           if (r) {
             const amtVal = parseFloat(block.querySelector('.lg-cal-edit-amt').value);
             if (!amtVal || amtVal <= 0) { App.toast('请输入有效金额'); return; }
-            const catBtn = block.querySelector('.lg-rec-cat.on');
-            const acctBtn = block.querySelector('.lg-rec-acct.on');
-            const cat = catBtn ? cats().find((c) => c.n === catBtn.dataset.cat) : null;
             r.amount = Math.round(amtVal * 100) / 100;
-            if (catBtn) {
-              r.cat = catBtn.dataset.cat;
-              r.type = cat ? cat.type : (catBtn.classList.contains('inc') ? 'inc' : 'exp');
+            if (r.type === 'transfer') {
+              const fromBtn = block.querySelector('[data-from].on');
+              const toBtn = block.querySelector('[data-to].on');
+              if (fromBtn) r.from = fromBtn.dataset.from;
+              if (toBtn) r.to = toBtn.dataset.to;
+              r.account = r.from;
+            } else {
+              const catBtn = block.querySelector('.lg-rec-cat.on');
+              const acctBtn = block.querySelector('.lg-rec-acct.on');
+              const cat = catBtn ? cats().find((c) => c.n === catBtn.dataset.cat) : null;
+              if (catBtn) {
+                r.cat = catBtn.dataset.cat;
+                r.type = cat ? cat.type : (catBtn.classList.contains('inc') ? 'inc' : 'exp');
+              }
+              if (acctBtn) r.account = acctBtn.dataset.acct;
             }
-            if (acctBtn) r.account = acctBtn.dataset.acct;
             save();
             calEditId = null;
             paintBalance(); paintSummary(); paintCalendar();
@@ -956,12 +1136,32 @@
           }
           return;
         }
+        const fromBtn = e.target.closest('[data-from]');
+        if (fromBtn) {
+          const edit = fromBtn.closest('.lg-rec-edit');
+          if (edit) edit.querySelectorAll('[data-from]').forEach((b) => b.classList.remove('on'));
+          fromBtn.classList.add('on');
+          const block = fromBtn.closest('.lg-rec-edit');
+          const r = state.records.find((x) => x.id === block.dataset.id);
+          if (r) { r.from = fromBtn.dataset.from; r.account = r.from; try { save(); } catch (e) {} }
+          return;
+        }
+        const toBtn = e.target.closest('[data-to]');
+        if (toBtn) {
+          const edit = toBtn.closest('.lg-rec-edit');
+          if (edit) edit.querySelectorAll('[data-to]').forEach((b) => b.classList.remove('on'));
+          toBtn.classList.add('on');
+          const block = toBtn.closest('.lg-rec-edit');
+          const r = state.records.find((x) => x.id === block.dataset.id);
+          if (r) { r.to = toBtn.dataset.to; try { save(); } catch (e) {} }
+          return;
+        }
         const delBtn = e.target.closest('[data-cal-del]');
         if (delBtn) {
           const id = delBtn.dataset.calDel;
           const r = state.records.find((x) => x.id === id);
           if (!r) return;
-          App.confirm('删除记录', '确认删除这笔「' + (r.cat || '待分类') + ' ' + money(r.amount) + '」？', () => {
+          App.confirm('删除记录', '确认删除这笔「' + (r.type === 'transfer' ? '转账' : (r.cat || '待分类')) + ' ' + money(r.amount) + '」？', () => {
             state.records = state.records.filter((x) => x.id !== id);
             save();
             calEditId = null;

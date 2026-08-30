@@ -2949,6 +2949,25 @@ code { background: var(--surface-2); padding: 2px 7px; border-radius: 7px; font-
 .lg-cal-item.inc .lg-cal-item-amt { color: #2e7d32; }
 .lg-cal-item.exp .lg-cal-item-amt { color: #c0392b; }
 
+/* ===== 转账模式（记账 / 转账 切换 + from→to） ===== */
+.lg-mode {
+  display: flex; gap: 6px; margin: 10px 0 8px;
+}
+.lg-mode button {
+  flex: 1; padding: 8px 0; border: 1px solid var(--border); background: var(--surface-2);
+  border-radius: 10px; font-size: 14px; font-weight: 600; color: var(--text); cursor: pointer;
+}
+.lg-mode button.on {
+  background: var(--accent-deep); border-color: var(--accent-deep); color: #fff;
+}
+.lg-transfer { margin: 0 0 10px; }
+.lg-transfer-row { display: flex; align-items: center; gap: 10px; }
+.lg-transfer-arrow { font-size: 18px; color: var(--muted); flex: none; }
+.lg-transfer-row .lg-filter-sel { flex: 1; min-width: 0; }
+/* 转账金额：中性色，不套用支出红 / 收入绿 */
+.lg-rec-amt-tr, .lg-cal-amt-tr { color: var(--text-strong); }
+.lg-rec-item.transfer .lg-rec-e, .lg-cal-item.transfer .lg-cal-item-e { filter: none; }
+
 /* ===== 记录编辑表单 ===== */
 .lg-rec-edit {
   margin: 6px 4px 10px; padding: 10px;
