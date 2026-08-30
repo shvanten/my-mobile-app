@@ -1077,6 +1077,7 @@
             let editInner;
             if (r.type === 'transfer') {
               editInner =
+                '  <div class="ci-field"><span>日期</span><input type="date" class="lg-cal-edit-date" value="' + r.date + '"></div>' +
                 '<div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-cal-edit-amt" value="' + r.amount + '"></div>' +
                 '<div class="lg-edit-label">转出账户</div>' +
                 '<div class="lg-rec-accts">' + acctBtns(r.from, 'from') + '</div>' +
@@ -1084,6 +1085,7 @@
                 '<div class="lg-rec-accts">' + acctBtns(r.to, 'to') + '</div>';
             } else {
               editInner =
+                '  <div class="ci-field"><span>日期</span><input type="date" class="lg-cal-edit-date" value="' + r.date + '"></div>' +
                 '<div class="ci-field"><span>金额</span><input type="number" inputmode="decimal" step="0.01" min="0" class="lg-cal-edit-amt" value="' + r.amount + '"></div>' +
                 '<div class="lg-edit-label">类型</div>' +
                 '<div class="lg-rec-cats">' +
@@ -1142,8 +1144,11 @@
           const block = saveBtn.closest('.lg-rec-edit');
           const r = state.records.find((x) => x.id === block.dataset.id);
           if (r) {
+            const dateVal = block.querySelector('.lg-cal-edit-date').value;
+            if (!dateVal) { App.toast('请选择日期'); return; }
             const amtVal = parseFloat(block.querySelector('.lg-cal-edit-amt').value);
             if (!amtVal || amtVal <= 0) { App.toast('请输入有效金额'); return; }
+            r.date = dateVal;
             r.amount = Math.round(amtVal * 100) / 100;
             if (r.type === 'transfer') {
               const fromBtn = block.querySelector('[data-from].on');
@@ -1163,6 +1168,9 @@
             }
             save();
             calEditId = null;
+            selDay = r.date;
+            const pd = r.date.split('-');
+            if (pd.length === 3) { calY = parseInt(pd[0], 10); calM = parseInt(pd[1], 10) - 1; }
             paintBalance(); paintSummary(); paintCalendar();
             App.toast('已保存');
           }
